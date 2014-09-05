@@ -1,0 +1,7 @@
+image: ../maps/VdG_pilot.pgm
+resolution: 0.080000
+origin: [-39.64, -39.4, 0.000000]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.196
+

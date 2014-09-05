@@ -1,0 +1,10 @@
+<launch>
+    <node name="map_server" pkg="map_server" type="map_server" args="$(find stage_simulation)/config/map_8thfloor.yaml">
+        <param name="frame_id" value="/map" />
+    </node>
+    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find stage_simulation)/config/simulation.rviz"/>    
+
+    <include file="$(find stage_simulation)/launch/stage.launch"/>
+    <include file="$(find stage_simulation)/launch/amcl.launch" />
+    <node pkg="active_perception_controller" type="random_controller.py" name="controller"/>
+</launch>

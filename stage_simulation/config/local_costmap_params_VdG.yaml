@@ -1,0 +1,15 @@
+local_costmap:
+  observation_sources: scan external_point_clouds
+  scan: {sensor_frame: laser, data_type: LaserScan, topic: scan, marking: true, clearing: true, obstacle_range: 2.5, raytrace_range: 3.0, expected_update_rate: 0.5}
+  global_frame: odom
+  robot_base_frame: base_link
+  update_frequency: 20.0
+  publish_frequency: 0.5
+  static_map: false
+  rolling_window: true
+  width: 5.0
+  height: 5.0
+  resolution: 0.1
+  #Setting the cost threshold to 253 induces the robot to move as close as physically possible to an obstacle
+  #Use only through move_base_supervisor reconfiguration, if needed.
+  lethal_cost_threshold: 100

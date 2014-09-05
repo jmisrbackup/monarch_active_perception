@@ -1,0 +1,13 @@
+obstacle_range: 2.5
+raytrace_range: 3.0
+inflation_radius: 0.5
+
+#---(in meters)---
+footprint: [ [0.325, 0.25], [-0.325, 0.25], [-0.325, -0.25], [0.325, -0.25] ]
+
+transform_tolerance: 5.0
+map_type: costmap
+
+observation_sources: laser_scan_sensor other_robot_info
+laser_scan_sensor: {sensor_frame: laser, data_type: LaserScan, topic: scan, marking: true, clearing: true, expected_update_rate: 0.5}
+external_point_clouds: {sensor_frame: map, data_type: PointCloud, topic: external_point_clouds, marking: true, clearing: false, obstacle_range: 200}

@@ -1,0 +1,9 @@
+inflation_radius: 1.5
+
+#---(in meters)---
+footprint: [ [0.3, 0.25], [-0.3, 0.25], [-0.3, -0.25], [0.3, -0.25] ]
+
+transform_tolerance: 5.0
+map_type: costmap
+
+external_point_clouds: {sensor_frame: map, data_type: PointCloud, topic: external_point_clouds, marking: true, clearing: false, obstacle_range: 200}

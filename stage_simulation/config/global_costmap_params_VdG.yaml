@@ -1,0 +1,8 @@
+global_costmap:
+  observation_sources: external_point_clouds
+  global_frame: /restricted_map
+  robot_base_frame: base_link
+  update_frequency: 2.0
+  publish_frequency: 0.5
+  static_map: true
+  lethal_cost_threshold: 100
