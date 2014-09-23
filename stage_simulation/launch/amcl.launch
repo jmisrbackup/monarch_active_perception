@@ -31,7 +31,7 @@
         <param name="odom_model_type" value="diff"/>
         <param name="odom_alpha1" value="0.2"/>
         <param name="odom_alpha2" value="0.2"/>
-        <param name="odom_alpha3" value="2.0"/>
+        <param name="odom_alpha3" value="0.2"/>
         <param name="odom_alpha4" value="0.2"/>
         <param name="odom_frame_id" value="odom"/>
         
