@@ -32,7 +32,7 @@ public:
     int getNumParticles();
     void setNumParticles();
     Particle* getParticle(int particle_id);
-    virtual void initUniform(size_t number_of_particles) = 0;
+    virtual void initUniform() = 0;
     virtual void predict(double timeStep) = 0;
     virtual void update(){};
     void resample();

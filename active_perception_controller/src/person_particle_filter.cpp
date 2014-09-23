@@ -12,7 +12,7 @@ PersonParticle::PersonParticle()
 
 /** Default constructor
   */
-PersonParticleFilter::PersonParticleFilter(int n_particles, nav_msgs::OccupancyGrid& map):ParticleFilter(map)
+PersonParticleFilter::PersonParticleFilter(int n_particles, nav_msgs::OccupancyGridConstPtr& map):ParticleFilter(map)
 {
     for(int i = 0; i < n_particles; i++)
     {

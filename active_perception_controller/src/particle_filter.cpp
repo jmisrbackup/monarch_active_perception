@@ -34,7 +34,7 @@ Particle* ParticleFilter::getParticle(int particle_id)
 {
     try
     {
-        return &(particles_.at(particle_id));
+        return particles_.at(particle_id);
     }
     catch(const std::out_of_range& oor)
     {

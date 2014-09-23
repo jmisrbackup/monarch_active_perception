@@ -1,7 +1,7 @@
 #include "ros/ros.h"
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
 #include "geometry_msgs/PoseArray.h"
-#include "nav_msg/OccupancyGrid.h"
+#include "nav_msgs/OccupancyGrid.h"
 #include "nav_msgs/GetMap.h"
 #include "std_msgs/Bool.h"
 #include "person_particle_filter.h"
@@ -67,15 +67,16 @@ PersonEstimator::PersonEstimator()
     private_nh.param("global_frame_id", global_frame_id_, string("map"));
 
     // Subscribe/advertise topics
-    person_belief_pub = nh_.advertise<geometry_msgs::PoseArray>("person_pose_cloud", 1);
-    robot_pose_sub = nh_.subscribe("amcl_pose", 1, &PersonEstimator::robotPoseReceived, this);
-    robot_cloud_sub = nh_.subscribe("particlecloud", 1, &PersonEstimator::robotCloudReceived, this);
-    rfid_sub = nh_.subscribe("rfid", 1, &PersonEstimator::rfidReceived, this);
+    person_belief_pub_ = nh_.advertise<geometry_msgs::PoseArray>("person_pose_cloud", 1);
+    robot_pose_sub_ = nh_.subscribe("amcl_pose", 1, &PersonEstimator::robotPoseReceived, this);
+    robot_cloud_sub_ = nh_.subscribe("particlecloud", 1, &PersonEstimator::robotCloudReceived, this);
+    rfid_sub_ = nh_.subscribe("rfid", 1, &PersonEstimator::rfidReceived, this);
 
     // Read the map
     requestMap();
 
-    person_pf_ = new PersonParticleFilter(num_particles, map_);
+    nav_msgs::OccupancyGridConstPtr map_ptr(&map_);
+    person_pf_ = new PersonParticleFilter(num_particles_, map_ptr);
 
     first_rob_pose_ = false;
     new_measure_ = false;
@@ -138,8 +139,8 @@ void PersonEstimator::runIteration()
         {
             PersonParticle* particle =  (PersonParticle *)person_pf_->getParticle(i);
 
-            cloud_msg.poses[i].position.x = particle->pose[0];
-            cloud_msg.poses[i].position.y = particle->pose[1];
+            cloud_msg.poses[i].position.x = particle->pose_[0];
+            cloud_msg.poses[i].position.y = particle->pose_[1];
         }
 
         person_belief_pub_.publish(cloud_msg);
