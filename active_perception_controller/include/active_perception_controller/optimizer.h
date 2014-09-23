@@ -28,7 +28,6 @@ private:
     Subscriber robot_cloud_sub_;
     Publisher cmd_vel_pub_;
     
-    
     PoseArray robot_particles_;
     PoseArray person_particles_;
 };

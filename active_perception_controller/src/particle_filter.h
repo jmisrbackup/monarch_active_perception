@@ -1,10 +1,11 @@
 #ifndef PARTICLE_FILTER_H
 #define PARTICLE_FILTER_H
 
-#include "geometry_msgs/PoseWithCovarianceStamped.h"
-#include "geometry_msgs/PoseArray.h"
-#include "std_msgs/Bool.h"
+#include <ros/ros.h>
+#include <nav_msgs/OccupancyGrid.h>
+
 #include <vector>
+
 
 using namespace std;
 
@@ -14,11 +15,8 @@ using namespace std;
 class Particle
 {
 public:
-    // Pose represented by this sample
-    vector<double> pose;
     // Weight for this pose
-    double weight;
-    Particle();
+    double weight_;
 };
 
 /**
@@ -28,21 +26,20 @@ class ParticleFilter
 {
 public:
     ParticleFilter();
-    ParticleFilter(int n_particles);
+    ParticleFilter(const nav_msgs::OccupancyGridConstPtr& map);
     ~ParticleFilter();
 
     int getNumParticles();
-    vector<double> getParticlePose(int particle_id);
-    void initUniform();
-    void predict(double timeStep);
-    void update(bool &rfid_mes, double &robot_x, double &robot_y);
-    void update(bool &rfid_mes, geometry_msgs::PoseArray &robot_cloud);
+    Particle const* getParticle(int particle_id);
+    virtual void initUniform(size_t number_of_particles) = 0;
+    virtual void predict(double timeStep) = 0;
+    virtual void update(){};
+    void resample();
+    void setMap(const nav_msgs::OccupancyGridConstPtr& map);
 
 protected:
-
-    int num_particles;
-    vector<Particle> particles;     ///< particle set.
+    vector<Particle> particles_;     ///< particle set.
+    nav_msgs::OccupancyGridConstPtr map_;
 };
-
 
 #endif

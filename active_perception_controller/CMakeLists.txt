@@ -107,8 +107,8 @@ target_link_libraries(optimization_node
    ${catkin_LIBRARIES}
 )
 
-add_executable(person_estimator src/person_estimator.cpp src/particle_filter.cpp)
-target_link_libraries(person_estimator ${catkin_LIBRARIES})
+#add_executable(person_estimator src/person_estimator.cpp src/particle_filter.cpp)
+#target_link_libraries(person_estimator ${catkin_LIBRARIES})
 
 #############
 ## Install ##
