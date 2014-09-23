@@ -30,7 +30,7 @@ int ParticleFilter::getNumParticles()
 /** Get a particle
   \param particle_id Identifier of the particle
   */
-Particle const* ParticleFilter::getParticle(int particle_id)
+Particle* ParticleFilter::getParticle(int particle_id)
 {
     try
     {

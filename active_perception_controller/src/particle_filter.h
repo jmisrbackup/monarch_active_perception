@@ -30,7 +30,8 @@ public:
     ~ParticleFilter();
 
     int getNumParticles();
-    Particle const* getParticle(int particle_id);
+    void setNumParticles();
+    Particle* getParticle(int particle_id);
     virtual void initUniform(size_t number_of_particles) = 0;
     virtual void predict(double timeStep) = 0;
     virtual void update(){};
@@ -38,7 +39,7 @@ public:
     void setMap(const nav_msgs::OccupancyGridConstPtr& map);
 
 protected:
-    vector<Particle> particles_;     ///< particle set.
+    vector<Particle*> particles_;     ///< particle set.
     nav_msgs::OccupancyGridConstPtr map_;
 };
 
