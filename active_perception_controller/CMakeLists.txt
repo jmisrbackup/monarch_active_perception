@@ -4,7 +4,7 @@ project(active_perception_controller)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED roscpp)
+find_package(catkin REQUIRED roscpp geometry_msgs std_msgs)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -106,6 +106,9 @@ add_executable(optimization_node src/optimization_node.cpp src/optimizer.cpp)
 target_link_libraries(optimization_node
    ${catkin_LIBRARIES}
 )
+
+add_executable(person_estimator src/person_estimator.cpp src/particle_filter.cpp)
+target_link_libraries(person_estimator ${catkin_LIBRARIES})
 
 #############
 ## Install ##
