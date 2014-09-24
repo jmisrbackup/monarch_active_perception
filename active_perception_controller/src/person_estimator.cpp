@@ -60,10 +60,12 @@ class PersonEstimator
 PersonEstimator::PersonEstimator()
 {
     ros::NodeHandle private_nh("~");
+    double sigma_person;
 
     // Read parameters
     private_nh.param("step_duration", step_duration_, 0.2);
     private_nh.param("num_particles", num_particles_, 5000);
+    private_nh.param("sigma_person", sigma_person, 1.0);
     private_nh.param("global_frame_id", global_frame_id_, string("map"));
 
     // Subscribe/advertise topics
@@ -76,7 +78,7 @@ PersonEstimator::PersonEstimator()
     requestMap();
 
     nav_msgs::OccupancyGridConstPtr map_ptr(&map_);
-    person_pf_ = new PersonParticleFilter(num_particles_, map_ptr);
+    person_pf_ = new PersonParticleFilter(num_particles_, map_ptr, sigma_person);
 
     first_rob_pose_ = false;
     new_measure_ = false;
@@ -187,6 +189,7 @@ void PersonEstimator::requestMap()
         ros::Duration d(0.5);
         d.sleep();
     }
+    ROS_INFO("Map retreived");
     map_ = resp.map;
 }
 
@@ -201,12 +204,12 @@ int main(int argc, char **argv)
     double step_duration = person_filter.getStepDuration();
     ros::Rate loop_rate(1.0/step_duration);
 
-    while (ros::ok())
-    {
+    //while (ros::ok())
+    //{
         ros::spinOnce();
         person_filter.runIteration();
         loop_rate.sleep();
-    }
+    //}
 
     return 0;
 }

@@ -12,6 +12,17 @@ ParticleFilter
 (const nav_msgs::OccupancyGridConstPtr& map)
 {
     map_ = map;
+
+    // Compute free space in map
+    free_space_ind_.resize(0);
+    for(int i = 0; i < map_->info.width; i++)
+    {
+        for(int j = 0; j < map_->info.height; j++)
+        {
+            if(map_->data[i*map_->info.width + j] == 0)
+                free_space_ind_.push_back(std::make_pair(i,j));
+        }
+    }
 }
 
 /** Destructor

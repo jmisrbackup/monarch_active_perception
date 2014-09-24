@@ -6,7 +6,6 @@
 
 #include <vector>
 
-
 using namespace std;
 
 /** \brief Information for a single particle
@@ -39,8 +38,9 @@ public:
     void setMap(const nav_msgs::OccupancyGridConstPtr& map);
 
 protected:
-    vector<Particle*> particles_;     ///< particle set.
+    vector<Particle*> particles_;           ///< particle set.
     nav_msgs::OccupancyGridConstPtr map_;
+    vector<pair<int,int> > free_space_ind_; ///< Map indices with free space
 };
 
 #endif
