@@ -27,7 +27,7 @@ public:
 class PersonParticleFilter : public ParticleFilter
 {
 public:
-    PersonParticleFilter(int n_particles, nav_msgs::OccupancyGridConstPtr& map, double sigma_pose);
+    PersonParticleFilter(int n_particles, nav_msgs::OccupancyGrid const* map, double sigma_pose);
     ~PersonParticleFilter();
 
     void initUniform();

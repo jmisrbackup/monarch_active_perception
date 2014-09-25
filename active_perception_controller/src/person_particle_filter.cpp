@@ -16,7 +16,7 @@ PersonParticle::PersonParticle()
    \param map Occupancy map
    \param sigma_pose Standard deviation of person movement noise
   */
-PersonParticleFilter::PersonParticleFilter(int n_particles, nav_msgs::OccupancyGridConstPtr& map, double sigma_pose):ParticleFilter(map)
+PersonParticleFilter::PersonParticleFilter(int n_particles, nav_msgs::OccupancyGrid const* map, double sigma_pose):ParticleFilter(map)
 {
     for(int i = 0; i < n_particles; i++)
     {

@@ -25,7 +25,7 @@ class ParticleFilter
 {
 public:
     ParticleFilter();
-    ParticleFilter(const nav_msgs::OccupancyGridConstPtr& map);
+    ParticleFilter(nav_msgs::OccupancyGrid const* map);
     ~ParticleFilter();
 
     int getNumParticles();
@@ -39,7 +39,7 @@ public:
 
 protected:
     vector<Particle*> particles_;           ///< particle set.
-    nav_msgs::OccupancyGridConstPtr map_;
+    nav_msgs::OccupancyGrid const *map_;
     vector<pair<int,int> > free_space_ind_; ///< Map indices with free space
 };
 

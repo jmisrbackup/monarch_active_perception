@@ -9,7 +9,7 @@ ParticleFilter
 
 ParticleFilter::
 ParticleFilter
-(const nav_msgs::OccupancyGridConstPtr& map)
+(nav_msgs::OccupancyGrid const *map)
 {
     map_ = map;
 

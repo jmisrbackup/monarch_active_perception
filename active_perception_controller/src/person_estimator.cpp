@@ -77,8 +77,7 @@ PersonEstimator::PersonEstimator()
     // Read the map
     requestMap();
 
-    nav_msgs::OccupancyGridConstPtr map_ptr(&map_);
-    person_pf_ = new PersonParticleFilter(num_particles_, map_ptr, sigma_person);
+    person_pf_ = new PersonParticleFilter(num_particles_, &map_, sigma_person);
 
     first_rob_pose_ = false;
     new_measure_ = false;
