@@ -15,8 +15,11 @@ PersonParticle::PersonParticle()
    \param n_particles Number of particles
    \param map Occupancy map
    \param sigma_pose Standard deviation of person movement noise
+   \param d_threshold Distance threshold to detect RFID tag
+   \param prob_positive_det Detection probability within range
+   \param prob_false_det Detection probability out of range
   */
-PersonParticleFilter::PersonParticleFilter(int n_particles, nav_msgs::OccupancyGrid const* map, double sigma_pose):ParticleFilter(map)
+PersonParticleFilter::PersonParticleFilter(int n_particles, nav_msgs::OccupancyGrid const* map, double sigma_pose, double d_threshold, double prob_positive_det, double prob_false_det):ParticleFilter(map)
 {
     for(int i = 0; i < n_particles; i++)
     {
@@ -25,6 +28,9 @@ PersonParticleFilter::PersonParticleFilter(int n_particles, nav_msgs::OccupancyG
 
     ran_generator_ = gsl_rng_alloc(gsl_rng_taus);
     sigma_pose_ = sigma_pose;
+    d_threshold_ = d_threshold;
+    prob_positive_det_ = prob_positive_det;
+    prob_false_det_ = prob_false_det;
 }
 
 /** Destructor
@@ -69,22 +75,61 @@ void PersonParticleFilter::predict(double timeStep)
 }
 
 /** Update particles with new RFID measure
-  \param mes RFID measure
+  \param rfid_mes RFID measure
   \param robot_x Current robot pose
   \param robot_y Current robot pose
+  \param robot_x_cov Covariance
+  \param robot_y_cov Covariance
   */
-void PersonParticleFilter::update(bool &rfid_mes, double &robot_x, double &robot_y)
+void PersonParticleFilter::update(bool &rfid_mes, double &robot_x, double &robot_y, double &robot_x_cov, double &robot_y_cov)
 {
+    double total_weight = 0.0;
 
+    // Update weights
+    for(int i = 0; i < particles_.size(); i++)
+    {
+        PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);
+        part_ptr->weight_ = computeObsProb(rfid_mes, robot_x, robot_y, robot_x_cov, robot_y_cov, part_ptr->pose_[0], part_ptr->pose_[1]);
+        total_weight += part_ptr->weight_;
+    }
+
+    // Normalize weights
+    for(int i = 0; i < particles_.size(); i++)
+    {
+        PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);
+        part_ptr->weight_ = part_ptr->weight_/total_weight;
+    }
 }
 
-/** Update particles with new RFID measure
-  \param mes RFID measure
-  \param robot_cloud Current robot pose cloud
+/** Compute the probability of obtaining an RFID measure given a reader and emitter
+  \param rfid_mes RFID measure
+  \param x_r Reader position
+  \param y_r Reader position
+  \param x_r_cov Covariance in robot position
+  \param y_r_cov Covariance in robot position
+  \param x_e Emitter position
+  \param y_e Emitter position
   */
-void PersonParticleFilter::update(bool &rfid_mes, geometry_msgs::PoseArray &robot_cloud)
+double PersonParticleFilter::computeObsProb(bool &rfid_mes, double x_r, double y_r, double x_r_cov, double y_r_cov, double x_e, double y_e)
 {
+    double obs_prob;
+    double distance = sqrt(((x_r-x_e)*(x_r-x_e)) + ((y_r-y_e)*(y_r-y_e)));
 
+    if(distance <= d_threshold_)
+    {
+        if(rfid_mes)
+            obs_prob = prob_positive_det_;
+        else
+            obs_prob = 1.0 - prob_positive_det_;
+    }
+    else
+    {
+        if(rfid_mes)
+            obs_prob = prob_false_det_;
+        else
+            obs_prob = 1.0 - prob_false_det_;
+    }
+    return obs_prob;
 }
 
 

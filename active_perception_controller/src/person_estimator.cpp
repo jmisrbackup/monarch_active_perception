@@ -32,6 +32,8 @@ class PersonEstimator
     geometry_msgs::PoseArray robot_cloud_;   /// Particles for robot pose
     double robot_x_;                         /// Robot position
     double robot_y_;
+    double robot_x_cov_;
+    double robot_y_cov_;
     bool first_rob_pose_;                    /// First robot pose arrived
     bool new_measure_;                       /// Indicates new measure arrived
     bool rfid_mes_;                          /// RFID measurement
@@ -61,11 +63,17 @@ PersonEstimator::PersonEstimator()
 {
     ros::NodeHandle private_nh("~");
     double sigma_person;
+    double d_threshold;
+    double prob_positive_det;
+    double prob_false_det;
 
     // Read parameters
     private_nh.param("step_duration", step_duration_, 0.2);
     private_nh.param("num_particles", num_particles_, 5000);
     private_nh.param("sigma_person", sigma_person, 1.0);
+    private_nh.param("sigma_person", d_threshold, 3.0);
+    private_nh.param("sigma_person", prob_positive_det, 0.9);
+    private_nh.param("sigma_person", prob_false_det, 0.2);
     private_nh.param("global_frame_id", global_frame_id_, string("map"));
 
     // Subscribe/advertise topics
@@ -77,7 +85,7 @@ PersonEstimator::PersonEstimator()
     // Read the map
     requestMap();
 
-    person_pf_ = new PersonParticleFilter(num_particles_, &map_, sigma_person);
+    person_pf_ = new PersonParticleFilter(num_particles_, &map_, sigma_person, d_threshold, prob_positive_det, prob_false_det);
 
     first_rob_pose_ = false;
     new_measure_ = false;
@@ -115,14 +123,14 @@ void PersonEstimator::runIteration()
         // Update if new measures
         if(new_measure_)
         {
-            person_pf_->update(rfid_mes_, robot_cloud_);
+            person_pf_->update(rfid_mes_, robot_x_, robot_y_, robot_x_cov_, robot_y_cov_);
             new_measure_ = false;
         }
         else
         {
             // When there is no leacture from RFID, consider a negative measure
             rfid_mes_ = false;
-            person_pf_->update(rfid_mes_, robot_cloud_);
+            person_pf_->update(rfid_mes_, robot_x_, robot_y_, robot_x_cov_, robot_y_cov_);
         }
         publish_data = true;
     }
@@ -155,6 +163,8 @@ void PersonEstimator::robotPoseReceived(const geometry_msgs::PoseWithCovarianceS
 {
     robot_x_ = pose_msg->pose.pose.position.x;
     robot_y_ = pose_msg->pose.pose.position.y;
+    robot_x_cov_ = pose_msg->pose.covariance[0];
+    robot_y_cov_ = pose_msg->pose.covariance[7];
 }
 
 /** Callback to receive the robot cloud.
