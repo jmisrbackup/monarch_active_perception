@@ -4,7 +4,6 @@
 #include "geometry_msgs/PoseArray.h"
 #include "particle_filter.h"
 
-#include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 #include <vector>
 
@@ -19,6 +18,7 @@ public:
     // Pose represented by this sample
     vector<double> pose_;
     PersonParticle();
+    PersonParticle(const PersonParticle &person_particle);
 };
 
 /**
@@ -33,9 +33,9 @@ public:
     void initUniform();
     void predict(double timeStep);
     void update(bool &rfid_mes, double &robot_x, double &robot_y, double &robot_x_cov, double &robot_y_cov);
+    void resample();
 
 protected:
-    gsl_rng *ran_generator_;        ///< Random number generator
     double sigma_pose_;             ///< Starndard deviation for person movement
     double d_threshold_;            ///< Distance threshold to detect RFID tag
     double prob_positive_det_;      ///< Detection probability within range

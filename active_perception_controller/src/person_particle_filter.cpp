@@ -11,6 +11,15 @@ PersonParticle::PersonParticle()
     weight_ = 0.0;
 }
 
+/** Copy constructor
+  */
+PersonParticle::PersonParticle(const PersonParticle &person_particle)
+{
+    pose_.clear();
+    pose_ = person_particle.pose_;
+    weight_ = person_particle.weight_;
+}
+
 /** Constructor
    \param n_particles Number of particles
    \param map Occupancy map
@@ -26,7 +35,6 @@ PersonParticleFilter::PersonParticleFilter(int n_particles, nav_msgs::OccupancyG
         particles_.push_back(new PersonParticle());
     }
 
-    ran_generator_ = gsl_rng_alloc(gsl_rng_taus);
     sigma_pose_ = sigma_pose;
     d_threshold_ = d_threshold;
     prob_positive_det_ = prob_positive_det;
@@ -37,7 +45,10 @@ PersonParticleFilter::PersonParticleFilter(int n_particles, nav_msgs::OccupancyG
   */
 PersonParticleFilter::~PersonParticleFilter()
 {
-    gsl_rng_free(ran_generator_);
+    for(int i = 0; i < particles_.size(); i++)
+    {
+        delete ((PersonParticle *)(particles_[i]));
+    }
 }
 
 /** Draw particles from a uniform distribution
@@ -94,6 +105,42 @@ void PersonParticleFilter::update(bool &rfid_mes, double &robot_x, double &robot
     }
 
     // Normalize weights
+    for(int i = 0; i < particles_.size(); i++)
+    {
+        PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);
+        part_ptr->weight_ = part_ptr->weight_/total_weight;
+    }
+}
+
+/** Resample the current set of particles according to the probability distribution
+  */
+void PersonParticleFilter::resample()
+{
+    vector<int> resampled_set = calcResampledSet();
+    vector<PersonParticle*> resampled_particles;
+
+    // Create new set
+    for(int i = 0; i < resampled_set.size(); i++)
+    {
+        resampled_particles.push_back(new PersonParticle(*((PersonParticle *)(particles_[resampled_set[i]]))));
+    }
+
+    // Free old set
+    for(int i = 0; i < particles_.size(); i++)
+    {
+        delete ((PersonParticle *)(particles_[i]));
+    }
+    particles_.clear();
+
+    // Replace with new set
+    double total_weight = 0.0;
+    for(int i = 0; i < resampled_particles.size(); i++)
+    {
+        particles_.push_back((Particle *)(resampled_particles[i]));
+        total_weight += resampled_particles[i]->weight_;
+    }
+
+    // Normalize
     for(int i = 0; i < particles_.size(); i++)
     {
         PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);

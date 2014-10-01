@@ -5,7 +5,9 @@
 ParticleFilter::
 ParticleFilter
 ()
-{}
+{
+    ran_generator_ = gsl_rng_alloc(gsl_rng_taus);
+}
 
 ParticleFilter::
 ParticleFilter
@@ -29,6 +31,7 @@ ParticleFilter
   */
 ParticleFilter::~ParticleFilter()
 {
+    gsl_rng_free(ran_generator_);
 }
 
 /** Get number of particles
@@ -52,4 +55,34 @@ Particle* ParticleFilter::getParticle(int particle_id)
         ROS_ERROR_STREAM("Particle index out of range!");
         return 0;
     }
+}
+
+/**  Method to resample particles according to the current distribution. The method is based on
+  the low-variance technique. The method determines which particles from the original set will
+  be used after resampling.
+  \return resampled_set Vector with the particles index to resample
+*/
+vector<int> ParticleFilter::calcResampledSet()
+{
+    vector<int> resampled_set;
+    double c, u, r;
+    int num_samples = particles_.size();
+
+    r = gsl_rng_uniform(ran_generator_)*(1.0/num_samples);
+
+    int m, i;
+
+    i = 0;
+    c = particles_[0]->weight_;
+    for (int m = 0; m < num_samples; m++)
+    {
+      u = r + (m) * (1.0 / num_samples);
+      while (u > c)
+      {
+        i = i + 1;
+        c = c + particles_[i]->weight_;
+      }
+      resampled_set.push_back(i);
+    }
+    return resampled_set;
 }

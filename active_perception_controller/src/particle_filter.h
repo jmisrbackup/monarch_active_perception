@@ -4,6 +4,7 @@
 #include <ros/ros.h>
 #include <nav_msgs/OccupancyGrid.h>
 
+#include <gsl/gsl_rng.h>
 #include <vector>
 
 using namespace std;
@@ -34,13 +35,15 @@ public:
     virtual void initUniform() = 0;
     virtual void predict(double timeStep) = 0;
     virtual void update(){};
-    void resample();
+    virtual void resample() = 0;
+    vector<int> calcResampledSet();
     void setMap(const nav_msgs::OccupancyGridConstPtr& map);
 
 protected:
     vector<Particle*> particles_;           ///< particle set.
     nav_msgs::OccupancyGrid const *map_;
     vector<pair<int,int> > free_space_ind_; ///< Map indices with free space
+    gsl_rng *ran_generator_;                ///< Random number generator
 };
 
 #endif
