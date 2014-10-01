@@ -10,7 +10,6 @@ find_package(catkin REQUIRED roscpp geometry_msgs std_msgs nav_msgs)
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
-
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
 ## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
@@ -105,8 +104,7 @@ add_executable(optimization_node src/optimization_node.cpp src/optimizer.cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(optimization_node
-   ${catkin_LIBRARIES}
-)
+                      gsl gslcblas ${catkin_LIBRARIES})
 
 add_executable(person_estimator src/person_estimator.cpp src/particle_filter.cpp src/person_particle_filter.cpp)
 target_link_libraries(person_estimator gsl gslcblas ${catkin_LIBRARIES})
