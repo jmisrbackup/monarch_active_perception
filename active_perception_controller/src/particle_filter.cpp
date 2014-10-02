@@ -25,6 +25,8 @@ ParticleFilter
                 free_space_ind_.push_back(std::make_pair(i,j));
         }
     }
+
+    ran_generator_ = gsl_rng_alloc(gsl_rng_taus);
 }
 
 /** Destructor

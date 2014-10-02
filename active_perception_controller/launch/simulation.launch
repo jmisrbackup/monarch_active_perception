@@ -7,7 +7,7 @@
     <include file="$(find stage_simulation)/launch/stage.launch"/>
     <include file="$(find stage_simulation)/launch/amcl.launch" />
     <node pkg="active_perception_controller" type="optimization_node" name="optimization_node" output="screen"/>
-    <node pkg="active_perception_controller" type="person_estimator" name="estimator" >
+    <node pkg="active_perception_controller" type="person_estimator" name="estimator">
     </node>
     
     <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">

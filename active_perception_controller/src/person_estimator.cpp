@@ -115,6 +115,7 @@ void PersonEstimator::runIteration()
     {
         person_pf_->initUniform();
         publish_data = true;
+        filter_running_ = true;
     }
     else if(filter_running_)
     {
@@ -132,6 +133,8 @@ void PersonEstimator::runIteration()
             rfid_mes_ = false;
             person_pf_->update(rfid_mes_, robot_x_, robot_y_, robot_x_cov_, robot_y_cov_);
         }
+        person_pf_->resample();
+
         publish_data = true;
     }
 
@@ -165,6 +168,9 @@ void PersonEstimator::robotPoseReceived(const geometry_msgs::PoseWithCovarianceS
     robot_y_ = pose_msg->pose.pose.position.y;
     robot_x_cov_ = pose_msg->pose.covariance[0];
     robot_y_cov_ = pose_msg->pose.covariance[7];
+
+    if(!first_rob_pose_)
+        first_rob_pose_ = true;
 }
 
 /** Callback to receive the robot cloud.
@@ -213,12 +219,12 @@ int main(int argc, char **argv)
     double step_duration = person_filter.getStepDuration();
     ros::Rate loop_rate(1.0/step_duration);
 
-    //while (ros::ok())
-    //{
+    while (ros::ok())
+    {
         ros::spinOnce();
         person_filter.runIteration();
         loop_rate.sleep();
-    //}
+    }
 
     return 0;
 }
