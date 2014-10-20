@@ -3,6 +3,7 @@
 using namespace std;
 using namespace geometry_msgs;
 using namespace nav_msgs;
+using namespace sensor_msgs;
 using namespace optimization;
 
 RobotMotionModel::RobotMotionModel() :
@@ -64,12 +65,15 @@ RobotMotionModel::~RobotMotionModel()
 
 Optimizer::
 Optimizer() :
-person_cloud_sub_ ( nh_.subscribe ( "person_location_cloud", 10, &Optimizer::personParticleCloudCallback, this ) ),
+person_cloud_sub_ ( nh_.subscribe ( "person_particle_cloud", 10, &Optimizer::personParticleCloudCallback, this ) ),
 robot_cloud_sub_ ( nh_.subscribe ( "particle_cloud", 10, &Optimizer::robotParticleCloudCallback, this ) ),
 robot_pose_sub_ ( nh_.subscribe ( "amcl_pose", 10, &Optimizer::robotPoseCallback, this ) ),
 robot_odom_sub_( nh_.subscribe ( "odom", 10, &Optimizer::robotOdomCallback, this ) ),
+nav_map_metadata_sub_ ( nh_.subscribe ( "map_metadata", 10, &Optimizer::navMapMetaDataCallback, this ) ),
 cmd_vel_pub_ ( nh_.advertise<Twist> ( "cmd_vel", 10 ) ),
-predicted_particles_pub_ ( nh_.advertise<PoseArray> ( "predicted_particle_cloud", 10 ) )
+predicted_particles_pub_ ( nh_.advertise<PoseArray> ( "predicted_particle_cloud", 10 ) ),
+cost_map_pub_ ( nh_.advertise<OccupancyGrid> ( "optimizer_cost_map", 10 ) ),
+smm_ (NULL)
 {
     double alpha_v, alpha_vxy, alpha_vw, alpha_wv, alpha_w, alpha_vg, alpha_wg;
     if(nh_.getParam("alpha_v", alpha_v)) rmm_.alpha_v = alpha_v;
@@ -84,9 +88,15 @@ predicted_particles_pub_ ( nh_.advertise<PoseArray> ( "predicted_particle_cloud"
 
 void
 Optimizer::
-personParticleCloudCallback(const PoseArrayConstPtr& msg)
+personParticleCloudCallback(const PointCloudConstPtr& msg)
 {
-
+    if(smm_ != NULL)
+    {
+        person_particles_ = *msg;
+        OccupancyGrid map;
+        smm_->applySensorModel(person_particles_,map);
+        cost_map_pub_.publish(map);
+    }
 }
 
 void
@@ -124,7 +134,14 @@ robotOdomCallback(const OdometryConstPtr& msg)
 
 void
 Optimizer::
+navMapMetaDataCallback(const MapMetaDataConstPtr& msg)
+{
+    string path = ros::package::getPath("active_perception_controller");
+    smm_ = new SensorModelMap(path+"/config/sensormodel.png", *msg);
+}
+
+void
+Optimizer::
 optimize()
 {
-    
 }

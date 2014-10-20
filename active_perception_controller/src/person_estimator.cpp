@@ -1,6 +1,7 @@
 #include "ros/ros.h"
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
 #include "geometry_msgs/PoseArray.h"
+#include "sensor_msgs/PointCloud.h"
 #include "nav_msgs/OccupancyGrid.h"
 #include "nav_msgs/GetMap.h"
 #include "std_msgs/Bool.h"
@@ -70,14 +71,14 @@ PersonEstimator::PersonEstimator()
     // Read parameters
     private_nh.param("step_duration", step_duration_, 0.2);
     private_nh.param("num_particles", num_particles_, 5000);
-    private_nh.param("sigma_person", sigma_person, 1.0);
+    private_nh.param("sigma_person", sigma_person, 0.05);
     private_nh.param("sigma_person", d_threshold, 3.0);
     private_nh.param("sigma_person", prob_positive_det, 0.9);
     private_nh.param("sigma_person", prob_false_det, 0.2);
     private_nh.param("global_frame_id", global_frame_id_, string("map"));
 
     // Subscribe/advertise topics
-    person_belief_pub_ = nh_.advertise<geometry_msgs::PoseArray>("person_pose_cloud", 1);
+    person_belief_pub_ = nh_.advertise<sensor_msgs::PointCloud>("person_particle_cloud", 1);
     robot_pose_sub_ = nh_.subscribe("amcl_pose", 1, &PersonEstimator::robotPoseReceived, this);
     robot_cloud_sub_ = nh_.subscribe("particlecloud", 1, &PersonEstimator::robotCloudReceived, this);
     rfid_sub_ = nh_.subscribe("rfid", 1, &PersonEstimator::rfidReceived, this);
@@ -129,7 +130,7 @@ void PersonEstimator::runIteration()
         }
         else
         {
-            // When there is no leacture from RFID, consider a negative measure
+            // When there is no reading from RFID, consider a negative measure
             rfid_mes_ = false;
             person_pf_->update(rfid_mes_, robot_x_, robot_y_, robot_x_cov_, robot_y_cov_);
         }
@@ -141,20 +142,23 @@ void PersonEstimator::runIteration()
     // Publish belief
     if(publish_data)
     {
-        geometry_msgs::PoseArray cloud_msg;
+        sensor_msgs::PointCloud cloud_msg;
         cloud_msg.header.stamp = ros::Time::now();
         cloud_msg.header.frame_id = global_frame_id_;
-        cloud_msg.poses.resize(person_pf_->getNumParticles());
+        cloud_msg.points.resize(person_pf_->getNumParticles());
+        sensor_msgs::ChannelFloat32 weights;
+        weights.values.resize(person_pf_->getNumParticles());
+        weights.name = "weights";
 
-        // Retreive particles
+        // Retrieve particles
         for(int i = 0; i < person_pf_->getNumParticles(); i++)
         {
             PersonParticle* particle =  (PersonParticle *)person_pf_->getParticle(i);
-
-            cloud_msg.poses[i].position.x = particle->pose_[0];
-            cloud_msg.poses[i].position.y = particle->pose_[1];
+            cloud_msg.points[i].x = particle->pose_[0];
+            cloud_msg.points[i].y = particle->pose_[1];
+            weights.values[i] = particle->weight_;
         }
-
+        cloud_msg.channels.push_back(weights);
         person_belief_pub_.publish(cloud_msg);
     }
 }

@@ -21,7 +21,7 @@ ParticleFilter
     {
         for(int j = 0; j < map_->info.height; j++)
         {
-            if(map_->data[i*map_->info.width + j] == 0)
+            if(map_->data[j*map_->info.width + i] == 0)
                 free_space_ind_.push_back(std::make_pair(i,j));
         }
     }

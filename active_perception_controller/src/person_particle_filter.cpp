@@ -1,13 +1,14 @@
 #include "person_particle_filter.h"
 #include <cstdlib>
 
+#define FILTER_ON_PREDICTION 1
+
 /**
   Constructor
   */
 PersonParticle::PersonParticle()
 {
-    pose_.push_back(0.0);
-    pose_.push_back(0.0);
+    pose_.resize(2,0);
     weight_ = 0.0;
 }
 
@@ -66,7 +67,7 @@ void PersonParticleFilter::initUniform()
         PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);
 
         part_ptr->pose_[0] = map_->info.origin.position.x + map_->info.resolution * free_point.first;
-        part_ptr->pose_[1] = map_->info.origin.position.y + map_->info.resolution * (map_->info.height - free_point.second);
+        part_ptr->pose_[1] = - (map_->info.origin.position.y + map_->info.resolution * (map_->info.height - free_point.second));
     }
 }
 
@@ -80,8 +81,19 @@ void PersonParticleFilter::predict(double timeStep)
     for(int i = 0; i < num_particles; i++)
     {
         PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);
-        part_ptr->pose_[0] += gsl_ran_gaussian(ran_generator_, sigma_pose_);
-        part_ptr->pose_[1] += gsl_ran_gaussian(ran_generator_, sigma_pose_);
+        double dx = gsl_ran_gaussian(ran_generator_, sigma_pose_);
+        double dy = gsl_ran_gaussian(ran_generator_, sigma_pose_);
+#ifdef FILTER_ON_PREDICTION
+		size_t map_x = floor((part_ptr->pose_[0] + dx - map_->info.origin.position.x)/map_->info.resolution);
+		size_t map_y = floor((part_ptr->pose_[1] + dy + map_->info.origin.position.y)/map_->info.resolution + map_->info.height);
+		if(map_->data[map_y*map_->info.width + map_x] != 0) //occupied cell
+		{
+			dx = 0;
+			dy = 0;
+		}
+#endif
+        part_ptr->pose_[0] += dx;
+        part_ptr->pose_[1] += dy;
     }
 }
 
@@ -159,6 +171,17 @@ void PersonParticleFilter::resample()
   */
 double PersonParticleFilter::computeObsProb(bool &rfid_mes, double x_r, double y_r, double x_r_cov, double y_r_cov, double x_e, double y_e)
 {
+
+#ifndef FILTER_ON_PREDICTION
+	size_t map_x = floor((x_e - map_->info.origin.position.x)/map_->info.resolution);
+	size_t map_y = floor((y_e + map_->info.origin.position.y)/map_->info.resolution + map_->info.height);
+
+	if(map_->data[map_y*map_->info.width + map_x] != 0) //occupied cell
+	{
+		return 0.0;
+	}
+#endif
+
     double obs_prob;
     double distance = sqrt(((x_r-x_e)*(x_r-x_e)) + ((y_r-y_e)*(y_r-y_e)));
 
