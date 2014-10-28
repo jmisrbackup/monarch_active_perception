@@ -97,7 +97,10 @@ include_directories(include ${OpenCV_INCLUDE_DIRS})
 # )
 
 ## Declare a cpp executable
-add_executable(optimization_node src/optimization_node.cpp src/optimizer.cpp src/sensor_model_map.cpp)
+add_executable(optimization_node src/optimization_node.cpp 
+								 src/optimizer.cpp 
+								 src/robot_sensor_model.cpp
+								 src/robot_motion_model.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes

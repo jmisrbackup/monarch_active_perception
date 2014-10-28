@@ -1,12 +1,12 @@
 /*
- * sensor_model_map.h
+ * robot_sensor_model.h
  *
  *  Created on: Oct 20, 2014
  *      Author: jmessias
  */
 
-#ifndef SENSOR_MODEL_MAP_H_
-#define SENSOR_MODEL_MAP_H_
+#ifndef ROBOT_SENSOR_MODEL_H_
+#define ROBOT_SENSOR_MODEL_H_
 
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -15,15 +15,19 @@
 #include <sensor_msgs/PointCloud.h>
 #include <nav_msgs/OccupancyGrid.h>
 
+#include <active_perception_controller/utility_map.h>
+
 namespace optimization
 {
-class SensorModelMap
+class RobotSensorModel
 {
 public:
-    SensorModelMap(const std::string& map_path,
+    RobotSensorModel(const std::string& map_path,
                    const nav_msgs::MapMetaData& map_metadata);
 
     void applySensorModel(const sensor_msgs::PointCloud& particle_set,
+                          nav_msgs::OccupancyGrid& map);
+    void applySensorModel(const geometry_msgs::Point32& particle,
                           nav_msgs::OccupancyGrid& map);
 private:
     cv::SparseMat sensor_map_;

@@ -13,32 +13,13 @@
 #include <geometry_msgs/Twist.h>
 #include <nav_msgs/Odometry.h>
 
-#include <active_perception_controller/sensor_model_map.h>
+#include <active_perception_controller/robot_motion_model.h>
+#include <active_perception_controller/robot_sensor_model.h>
 
 #define DEBUG 1
 
 namespace optimization
 {
-
-class RobotMotionModel
-{
-public:
-    RobotMotionModel();
-    ~RobotMotionModel();
-    void sample(const geometry_msgs::Twist& vel,
-            const geometry_msgs::Pose& pose, double delta_t, size_t n_samples,
-            geometry_msgs::PoseArray* samples);
-
-    double alpha_v;
-    double alpha_vxy;
-    double alpha_vw;
-    double alpha_w;
-    double alpha_wv;
-    double alpha_vg;
-    double alpha_wg;
-private:
-    gsl_rng* rng_;
-};
 
 class Optimizer
 {
@@ -79,7 +60,7 @@ private:
     geometry_msgs::PoseArray robot_particles_;
     sensor_msgs::PointCloud person_particles_;
     RobotMotionModel rmm_;
-    SensorModelMap* smm_;
+    RobotSensorModel* rsm_;
 };
 }
 

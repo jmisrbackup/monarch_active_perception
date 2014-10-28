@@ -1,7 +1,7 @@
 #include "person_particle_filter.h"
 #include <cstdlib>
 
-#define FILTER_ON_PREDICTION 1
+#define FILTER_ON_PREDICTION 0
 
 /**
   Constructor
