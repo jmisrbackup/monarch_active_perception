@@ -11,8 +11,6 @@ import cPickle as pickle
 print "+ scipy"
 import numpy as np
 import scipy.linalg
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 
 print "+ dirs"
 if False: #os.path.exists('/Users/yoda'):
@@ -494,7 +492,7 @@ def test6(state="test4.state"):
     rospy.init_node('test6', argv=sys.argv)
     tfl = tf.TransformListener()
     sub = rospy.Subscriber("scan", LaserScan, lidar_handler)
-    pub = rospy.Publisher("particles", PointCloud)
+    pub = rospy.Publisher("particles", PointCloud, queue_size=1)
     rate = rospy.timer.Rate(1)
     print "Node ready -- starting loop"
     publish_particles()
@@ -527,6 +525,9 @@ def main(argv):
 
 
 if __name__=='__main__':
+    import matplotlib.pyplot as plt
+    import matplotlib.cm as cm
+
     main(rospy.myargv(sys.argv))
 
 # EOF
