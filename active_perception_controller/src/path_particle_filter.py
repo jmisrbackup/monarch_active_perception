@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+print "+ sys"
 import sys
 import os.path
 import time
@@ -7,11 +8,14 @@ import math
 import random
 import cPickle as pickle
 
+print "+ scipy"
 import numpy as np
+import scipy.linalg
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
-if os.path.exists('/Users/yoda'):
+print "+ dirs"
+if False: #os.path.exists('/Users/yoda'):
     # Hack it for speed
     SCOUT_NAVIGATION_DIR = "/Users/yoda/monarch/trunk/rosbuild_ws/scout_navigation"
     MAPS_DIR = "/Users/yoda/monarch/trunk/rosbuild_ws/maps"
@@ -20,12 +24,14 @@ else:
     SCOUT_NAVIGATION_DIR = roslib.packages.get_pkg_dir('scout_navigation')
     MAPS_DIR = roslib.packages.get_pkg_dir('maps')
 
+print "+ ros"
 import rospy
 import rosbag
 import tf
 from sensor_msgs.msg import *
 from geometry_msgs.msg import *
 
+print "+ planner"
 sys.path.append( SCOUT_NAVIGATION_DIR )
 import planner
 
@@ -61,9 +67,23 @@ class PathParticleFilter:
         """func maps an array of [index,coordinate] points to importances of [index]"""
         self.logprob += func(self.points)
 
+    def resample(self):
+        # get normalized probabilities
+        m = len(self.logprob)
+        w = np.exp(self.logprob)
+        w /= w.sum()
+        # determine indices of new samples
+        si  = scipy.linalg.toeplitz(w, np.zeros_like(w)).sum(axis=1)
+        rj  = (np.random.random() + np.arange(m)) / m
+        dij = si[:,None] - rj[None,:]
+        dij[dij<0] = np.inf
+        k   = dij.argmin(axis=0)
+        # replace particles and update weights
+        self.points = self.points[k]
+        self.logprob = np.zeros(len(self.points))
     
 class MapParticleModel:
-    particles = None
+    filters = None
     paths = cells = None
     
     def __init__(self, mapfile, clearance=DEFAULT_CLEARANCE):
@@ -137,7 +157,7 @@ class MapParticleModel:
         assert self.cells is not None, "no paths were generated"
         # self.sampled_paths = []
         # self.cell_dict = {}
-        self.particles = [ PathParticleFilter(cs, factor) for cs in self.cells ]
+        self.filters = [ PathParticleFilter(cs, factor) for cs in self.cells ]
         # for s in samples:
         #     if s in self.cell_dict:
         #         self.cell_dict[s].append(k)
@@ -221,7 +241,7 @@ class MapParticleModel:
         return (im, jm)
 
     def compute_importance(self, scan, xr, yr, tr):
-        assert self.particles is not None, "no particles were generated yet"
+        assert self.filters is not None, "no filters were generated yet"
         # determine swept cells
         (im, jm) = self.find_swept_cells(scan, xr, yr, tr)
         # bounding box of swept cells
@@ -245,9 +265,13 @@ class MapParticleModel:
             res[hits] = -1
             #print "importance: %s hits in %s points"%(hits.sum(),n)
             return res
-        for p in self.particles:
+        for p in self.filters:
             p.apply_importance(importance)
         
+    def resample(self):
+        assert self.filters is not None, "no filters were generated yet"
+        for p in self.filters:
+            p.resample()
 
 
 
@@ -279,7 +303,7 @@ def test2(state=None):
         plt.imshow(mpm.pln.occgrid, cmap=cm.gray_r)
         #plt.subplot(121)
         # pts = np.zeros(mpm.pln.free.shape)
-        # for p in mpm.particles:
+        # for p in mpm.filters:
         #     (i,j) = mpm.pln.p2i(p)
         #     pts[i,j]=1
         # plt.imshow(pts, cmap=cm.gray_r)
@@ -358,33 +382,43 @@ def test4(state=None, scan="scan.state"):
         pose = data['pose']
     # 4. compute importance
     mpm.compute_importance(scan, pose[0], pose[1], pose[2])
-
-        
+    #
+    plt.subplot(131)
+    img = np.zeros(mpm.pln.occgrid.shape)
+    for p in mpm.filters:
+        img[p.points[:,0], p.points[:,1]] = 1
+    plt.imshow(img, cmap=cm.gray_r)
+    #
+    plt.subplot(132)
+    img = -np.ones(mpm.pln.occgrid.shape)
+    for p in mpm.filters:
+        img[p.points[:,0], p.points[:,1]] = p.logprob
+    plt.imshow(img)
+    #
     # 5. resample
+    mpm.resample()
+    #
+    plt.subplot(133)
+    img = np.zeros(mpm.pln.occgrid.shape)
+    for p in mpm.filters:
+        img[p.points[:,0], p.points[:,1]] = 1
+    plt.imshow(img, cmap=cm.gray_r)
+    #
+
+    
     # 6. diffuse samples
 
 
     #
-    plt.subplot(221)
-    plt.imshow(mpm.pln.occgrid, cmap=cm.gray_r)
+    # plt.subplot(221)
+    # plt.imshow(mpm.pln.occgrid, cmap=cm.gray_r)
     #
-    plt.subplot(222)
-    img = np.zeros(mpm.pln.occgrid.shape)
-    (im, jm) = mpm.find_swept_cells(scan, pose[0], pose[1], pose[2])
-    img[im,jm] = 1
-    plt.imshow(img, cmap=cm.gray_r)
+    # plt.subplot(222)
+    # img = np.zeros(mpm.pln.occgrid.shape)
+    # (im, jm) = mpm.find_swept_cells(scan, pose[0], pose[1], pose[2])
+    # img[im,jm] = 1
+    # plt.imshow(img, cmap=cm.gray_r)
     #
-    plt.subplot(223)
-    img = np.zeros(mpm.pln.occgrid.shape)
-    for p in mpm.particles:
-        img[p.points[:,0], p.points[:,1]] = 1
-    plt.imshow(img, cmap=cm.gray_r)
-    #
-    plt.subplot(224)
-    img = np.zeros(mpm.pln.occgrid.shape)
-    for p in mpm.particles:
-        img[p.points[:,0], p.points[:,1]] = p.logprob
-    plt.imshow(img, cmap=cm.gray_r)
     #
     plt.show()
 
@@ -436,12 +470,12 @@ def test6(state="test4.state"):
         points = []
         logprob = []
         #n = 0
-        for pp in mpm.particles:
+        for pp in mpm.filters:
             (xx, yy) = mpm.pln.np_i2p((pp.points[:,0], pp.points[:,1]))
             points.extend( [Point32(xx[i],yy[i],0) for i in xrange(len(pp.points))] ) # if pp.logprob[i]>=0] )
             logprob.extend(pp.logprob)
             #n += (pp.logprob<0).sum()
-        #print "hidding", n, "particles"
+        #print "hidding", n, "filters"
         cloud = PointCloud()
         cloud.header.frame_id = MAP_FRAME
         cloud.points = points
@@ -454,8 +488,8 @@ def test6(state="test4.state"):
     #
     print "Initial sampling"
     mpm.sample_paths(FACTOR)
-    print len(mpm.particles), "filters, total of",
-    print sum([len(p.points) for p in mpm.particles]), "particles"
+    print len(mpm.filters), "filters, total of",
+    print sum([len(p.points) for p in mpm.filters]), "particles"
     #
     rospy.init_node('test6', argv=sys.argv)
     tfl = tf.TransformListener()
