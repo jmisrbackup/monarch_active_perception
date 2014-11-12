@@ -499,10 +499,17 @@ def test6(state="test4.state"):
     while not rospy.is_shutdown():
         for (frame,(pose,scan)) in scans.iteritems():
             print "-- got scan at", frame, "=", pose
+            #
             t1 = time.time()
             mpm.compute_importance(scan, pose[0], pose[1], pose[2])
             t2 = time.time()
+            #
             print "[compute_importance took %f ms]"%(1000*(t2-t1))
+            t1 = time.time()
+            mpm.resample()
+            t2 = time.time()
+            #
+            print "[resample took %f ms]"%(1000*(t2-t1))
             publish_particles()
         rate.sleep()
 
