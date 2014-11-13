@@ -13,14 +13,9 @@ import numpy as np
 import scipy.linalg
 
 print "+ dirs"
-if False: #os.path.exists('/Users/yoda'):
-    # Hack it for speed
-    SCOUT_NAVIGATION_DIR = "/Users/yoda/monarch/trunk/rosbuild_ws/scout_navigation"
-    MAPS_DIR = "/Users/yoda/monarch/trunk/rosbuild_ws/maps"
-else:
-    import roslib
-    SCOUT_NAVIGATION_DIR = roslib.packages.get_pkg_dir('scout_navigation')
-    MAPS_DIR = roslib.packages.get_pkg_dir('maps')
+import roslib
+SCOUT_NAVIGATION_DIR = roslib.packages.get_pkg_dir('scout_navigation')
+MAPS_DIR = roslib.packages.get_pkg_dir('maps')
 
 print "+ ros"
 import rospy
@@ -38,8 +33,8 @@ import planner
 DEFAULT_MAP = os.path.join(MAPS_DIR, "EPFL-v02cr_nav.yaml")
 MAP_FRAME = 'map'
 DEFAULT_CLEARANCE = 0.5
-N_PARTICLES = 200
-FACTOR = 0.1
+N_PARTICLES = 500
+FACTOR = 0.2
 
 
 
@@ -59,7 +54,7 @@ class PathParticleFilter:
         samples = [tuple(cells[:,random.randint(0,n-1)]) for i in xrange(total)]
         self.points = np.array(samples, dtype=int)
         self.logprob = np.zeros(total)
-        print "path: length=%s, took %s samples"%(n,total)
+        #print "path: length=%s, took %s samples"%(n,total)
 
     def apply_importance(self, func):
         """func maps an array of [index,coordinate] points to importances of [index]"""
@@ -164,17 +159,42 @@ class MapParticleModel:
         # print "total samples:", sum([len(s) for s in self.sampled_paths])
         # print "unique cells:", len(self.cell_dict)
 
-    def find_swept_cells(self, scan, xr, yr, tr):
+    def find_swept_cells(self, scan, pose):
+        """scan is a ROS scan msg; pose is a (position, quaternion) tuple"""
         s = self.pln.scale
+        #
+        (position, quaternion) = pose
         z = np.array(scan.ranges)
-        a = tr + np.arange(scan.angle_min, scan.angle_min+scan.angle_increment*len(z), scan.angle_increment)
-        a = fix_angle(a)
+        a = np.arange(scan.angle_min, scan.angle_min+scan.angle_increment*len(z), scan.angle_increment)
         assert len(z)==len(a), "Range and angle arrays do not match"
+        # discard invalid ranges
         valid = np.isfinite(z)
         zv = z[valid]
         valid[valid] = (zv>scan.range_min) & (zv<scan.range_max)
         assert valid.any(), "No valid scan line found"
         z, a = z[valid], a[valid]
+        # obtain laser pointcloud in device coordinates
+        xl = z*np.cos(a)
+        yl = z*np.sin(a)
+        # transform pointcloud according to tf
+        T = tf.transformations.quaternion_matrix(quaternion)
+        R = T[0:3,0:3]
+        pl = np.vstack([xl, yl, np.zeros_like(z)])
+        pb = np.dot(R, pl)
+        xli = pb[0,:]
+        yli = pb[1,:]
+        a = np.arctan2(yli, xli)
+        #
+        # BROKEN CODE: (does not account for arbitrary LIDAR placements)
+        # z = np.array(scan.ranges)
+        # a = tr + np.arange(scan.angle_min, scan.angle_min+scan.angle_increment*len(z), scan.angle_increment)
+        # a = fix_angle(a)
+        # assert len(z)==len(a), "Range and angle arrays do not match"
+        # valid = np.isfinite(z)
+        # zv = z[valid]
+        # valid[valid] = (zv>scan.range_min) & (zv<scan.range_max)
+        # assert valid.any(), "No valid scan line found"
+        # z, a = z[valid], a[valid]
         #
         t1 = time.time()
         # determine quadrants
@@ -220,49 +240,93 @@ class MapParticleModel:
         print "[sweep in index coords: %f ms]"%(1000*(time.time()-t1))
         # determine swept map indices found free
         t1 = time.time()
-        (ir, jr) = self.pln.p2i((xr,yr))
-        im = ir + i[m==1]
-        jm = jr + j[m==1]
+        (ir, jr) = self.pln.p2i((position[0], position[1]))
+        imfree = ir + i[m==1]
+        jmfree = jr + j[m==1]
+        imocc  = ir + i[m==2]
+        jmocc  = jr + j[m==2]
         # check map limits
-        valid = (im>=0) & (im<self.pln.H) & (jm>=0) & (jm<self.pln.W)
-        im = im[valid]
-        jm = jm[valid]
-        # prune repeated cells
-        matches = np.logical_and(im[1:]==im[:-1],
-                                 jm[1:]==jm[:-1])
-        unique = np.ones_like(jm, dtype=bool)
-        unique[:-1] = np.logical_not(matches)
-        print "prunning repeated cells:", len(im),
-        im = im[unique]
-        jm = jm[unique]
-        print "->", len(im)
-        return (im, jm)
+        valid = (imfree>=0) & (imfree<self.pln.H) & (jmfree>=0) & (jmfree<self.pln.W)
+        imfree = imfree[valid]
+        jmfree = jmfree[valid]
+        valid = (imocc>=0) & (imocc<self.pln.H) & (jmocc>=0) & (jmocc<self.pln.W)
+        imocc = imocc[valid]
+        jmocc = jmocc[valid]
+        # # prune repeated cells -- TODO: rethink this method; doesn't seem to work at all
+        # matches = np.logical_and(imfree[1:]==imfree[:-1],
+        #                          jmfree[1:]==jmfree[:-1])
+        # unique = np.ones_like(jmfree, dtype=bool)
+        # unique[:-1] = np.logical_not(matches)
+        # print "prunning repeated free cells:", len(imfree),
+        # imfree = imfree[unique]
+        # jmfree = jmfree[unique]
+        # print "->", len(imfree)
+        return (imfree, jmfree, imocc, jmocc)
 
-    def compute_importance(self, scan, xr, yr, tr):
+    def compute_importance(self, scan, pose):
         assert self.filters is not None, "no filters were generated yet"
         # determine swept cells
-        (im, jm) = self.find_swept_cells(scan, xr, yr, tr)
+        (imfree, jmfree, imocc, jmocc) = self.find_swept_cells(scan, pose)
         # bounding box of swept cells
-        imin, imax = im.min(), im.max()
-        jmin, jmax = jm.min(), jm.max()
+        imin = min(imfree.min(), imocc.min())
+        imax = max(imfree.max(), imocc.max())
+        jmin = min(jmfree.min(), jmocc.min())
+        jmax = max(jmfree.max(), jmocc.max())
         ww  = jmax - jmin + 1
         wh  = imax - imin + 1
-        win = np.zeros((wh, ww), dtype=bool)
-        win[im-imin, jm-jmax] = True
-        # determine particles hit
+        # win is a map window containing the log prob of occupancy for each cell
+        win = np.zeros((wh, ww))
+        win[imfree-imin, jmfree-jmin] = -1
+
+        # hacking I
+        # win[ imocc-imin, jmocc-jmin ] = +1
+
+        # hacking II
+        kernel = np.array([[0.5, 1.0, 0.5],
+                           [1.0, 1.0, 1.0],
+                           [0.5, 1.0, 0.5]])
+        for i in xrange(3):
+            for j in xrange(3):
+                u = imocc-imin -1+i
+                v = jmocc-jmin -1+j
+                valid = (u>=0) & (u<wh) & (v>=0) & (v<ww)
+                win[ u[valid], v[valid] ] = kernel[i,j]
+
+        # determine log prob increments for swept cells
         def importance(points):
             """assume points in [index,coordinate]"""
             n  = len(points)
             ii = points[:,0] - imin
             jj = points[:,1] - jmin
             valid = (ii>=0) & (ii<wh) & (jj>=0) & (jj<ww)
-            hits = np.zeros(n, dtype=bool)
-            hits[valid] = win[ ii[valid], jj[valid] ]
-            # HACK for testing
-            res = np.zeros(n)
-            res[hits] = -1
-            #print "importance: %s hits in %s points"%(hits.sum(),n)
-            return res
+            logprob = np.zeros(n)
+            logprob[valid] = win[ ii[valid], jj[valid] ]
+            return logprob
+
+        # OLD CODE
+        # # winfree and winocc are map windows containing swept cells
+        # winfree = np.zeros((wh, ww), dtype=bool)
+        # winfree[imfree-imin, jmfree-jmin] = True  # NOTE: did s/jmax/jmin/g here
+        # winocc = np.zeros((wh, ww), dtype=bool)
+        # winocc[imocc-imin, jmocc-jmin] = True
+        # # determine log prob increments for swept cells
+        # def importance(points):
+        #     """assume points in [index,coordinate]"""
+        #     n  = len(points)
+        #     ii = points[:,0] - imin
+        #     jj = points[:,1] - jmin
+        #     valid = (ii>=0) & (ii<wh) & (jj>=0) & (jj<ww)
+        #     free = np.zeros(n, dtype=bool)
+        #     free[valid] = winfree[ ii[valid], jj[valid] ]
+        #     occ = np.zeros(n, dtype=bool)
+        #     occ[valid] = winocc[ ii[valid], jj[valid] ]
+        #     # HACK: hardcoded log prob increments
+        #     res = np.zeros(n)
+        #     res[free] = -1
+        #     res[occ]  = +1
+        #     #print "importance: %s hits in %s points"%(hits.sum(),n)
+        #     return res
+
         for p in self.filters:
             p.apply_importance(importance)
         
@@ -285,14 +349,13 @@ def test1():
 
         
 def test2(state=None):
-    """sampled paths generation"""
+    """path filters generation"""
     if state is None:
         mpm = MapParticleModel(DEFAULT_MAP)
         mpm.gen_paths_pair(N_PARTICLES)
-        mpm.sample_paths(0.1)
-        with open("test2.state", 'w') as fh:
+        with open("path_filters.state", 'w') as fh:
             pickle.dump(mpm, fh)
-        print "Saved state to test2.state"
+        print "Saved state to path_filters.state"
     else:
         with open(state) as fh:
             mpm = pickle.load(fh)
@@ -314,10 +377,13 @@ def test2(state=None):
 
 
 
-def test3():
-    """gridmap laser coverage testbed"""
-    with open("scan.msg") as fh:
-        scan = pickle.load(fh)
+def test3(state="scan.state"):
+    """gridmap laser coverage testbed; args: [state]"""
+    with open(state) as fh:
+        data = pickle.load(fh)
+        scan = data['scan']
+        pose = data['pose']
+        print "Loaded scan from", state
     #
     # t1 = time.time()
     # # determine world coordinates of sweep
@@ -340,10 +406,13 @@ def test3():
     # yh = y[xrange(len(a)),kh]
     # print "[sweep in world coords: %f ms]"%(1000*(time.time()-t1))
     mpm = MapParticleModel(DEFAULT_MAP)
-    (ii, jj) = mpm.find_swept_cells(scan, 13.2222172269, 28.7991394082, 0.4549502786420685)
+    (iif, jjf, iio, jjo) = mpm.find_swept_cells(scan, pose)
+    (iim, jjm) = mpm.pln.occ.nonzero()
     # make a bitmap
     img = np.zeros_like(mpm.pln.occgrid)
-    img[ii, jj] = 1
+    img[iif, jjf] = 1
+    img[iio, jjo] = 2
+    img[iim, jjm] = 3
     #
     print "plotting..."
     # plt.subplot(121)
@@ -357,19 +426,12 @@ def test3():
     plt.show()
 
 
-def test4(state=None, scan="scan.state"):
+def test4(state="path_filters.state", scan="scan.state"):
     """one cycle of path particle filter; arguments: [state [scan]]"""
-    # 1. generate or load paths
-    if state is None:
-        mpm = MapParticleModel(DEFAULT_MAP)
-        mpm.gen_paths_pair(N_PARTICLES)
-        with open("test4.state", 'w') as fh:
-            pickle.dump(mpm, fh)
-        print "Saved state to test4.state"
-    else:
-        with open(state) as fh:
-            print "Loading filter state from", state
-            mpm = pickle.load(fh)
+    # 1. load paths
+    with open(state) as fh:
+        print "Loading filter state from", state
+        mpm = pickle.load(fh)
     # 2. initial path samples
     print "Initial sampling"
     mpm.sample_paths(FACTOR)
@@ -379,7 +441,7 @@ def test4(state=None, scan="scan.state"):
         scan = data['scan']
         pose = data['pose']
     # 4. compute importance
-    mpm.compute_importance(scan, pose[0], pose[1], pose[2])
+    mpm.compute_importance(scan, pose)
     #
     plt.subplot(131)
     img = np.zeros(mpm.pln.occgrid.shape)
@@ -413,7 +475,7 @@ def test4(state=None, scan="scan.state"):
     #
     # plt.subplot(222)
     # img = np.zeros(mpm.pln.occgrid.shape)
-    # (im, jm) = mpm.find_swept_cells(scan, pose[0], pose[1], pose[2])
+    # (im, jm) = mpm.find_swept_cells(scan, pose)
     # img[im,jm] = 1
     # plt.imshow(img, cmap=cm.gray_r)
     #
@@ -431,8 +493,7 @@ def test5(state="scan.state"):
         if scan[0] is None or pose[0] is None:
             try:
                 frame = msg.header.frame_id
-                (position, quaternion) = tfl.lookupTransform(MAP_FRAME, frame, rospy.Time())
-                pose[0] = (position[0], position[1], 2*math.atan2(quaternion[2], quaternion[3]))
+                pose[0] = tfl.lookupTransform(MAP_FRAME, frame, rospy.Time())
                 scan[0] = msg
                 print "got scan from %s to %s"%(MAP_FRAME, frame)
                 rospy.signal_shutdown("got scan")
@@ -441,6 +502,7 @@ def test5(state="scan.state"):
     rospy.init_node('test5', anonymous=True, argv=sys.argv)
     tfl = tf.TransformListener()
     sub = rospy.Subscriber("scan", LaserScan, handler)
+    print "Waiting for scans"
     rospy.spin()
     if scan[0] is not None and pose[0] is not None:
         with open(state, 'w') as fh:
@@ -451,15 +513,14 @@ def test5(state="scan.state"):
 
 
 
-def test6(state="test4.state"):
+def test6(state="path_filters.state"):
     """closed loop experiment"""
     scans = {}
     #
     def lidar_handler(msg):
         frame = msg.header.frame_id
         try:
-            (position, quaternion) = tfl.lookupTransform(MAP_FRAME, frame, rospy.Time())
-            pose = (position[0], position[1], 2*math.atan2(quaternion[2], quaternion[3]))
+            pose = tfl.lookupTransform(MAP_FRAME, frame, rospy.Time())
         except tf.Exception:
             return
         scans[frame] = (pose, msg)
@@ -498,15 +559,15 @@ def test6(state="test4.state"):
     publish_particles()
     while not rospy.is_shutdown():
         for (frame,(pose,scan)) in scans.iteritems():
-            print "-- got scan at", frame, "=", pose
+            print "-- got scan at", frame
             #
             t1 = time.time()
-            mpm.compute_importance(scan, pose[0], pose[1], pose[2])
+            mpm.compute_importance(scan, pose)
             t2 = time.time()
             #
             print "[compute_importance took %f ms]"%(1000*(t2-t1))
             t1 = time.time()
-            mpm.resample()
+            #mpm.resample()
             t2 = time.time()
             #
             print "[resample took %f ms]"%(1000*(t2-t1))

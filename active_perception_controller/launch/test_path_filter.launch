@@ -1,0 +1,14 @@
+<!-- -*- xml -*- -->
+<launch>
+
+  <!-- since bag was recorded on mbot02: -->
+  <remap from="/tf" to="/mbot02/tf"/>
+  <remap from="scan" to="/mbot02/scan"/>
+
+  <node name="map_server" pkg="map_server" type="map_server" args="$(find maps)/EPFL-v02cr_nav.yaml"/>
+
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find active_perception_controller)/config/path_filter.rviz"/>
+
+  <node pkg="active_perception_controller" type="path_particle_filter.py" name="path_particle_filter" output="screen" args="test6 $(find active_perception_controller)/data/path_filters.state"/>
+
+</launch>
