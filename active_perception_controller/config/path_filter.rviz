@@ -194,9 +194,9 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: true
       Max Color: 0; 0; 255
-      Max Intensity: 0
+      Max Intensity: 10
       Min Color: 200; 200; 200
-      Min Intensity: -2
+      Min Intensity: -10
       Name: PointCloud
       Position Transformer: XYZ
       Queue Size: 10
@@ -262,5 +262,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 1008
-  X: 1539
+  X: 1532
   Y: 24

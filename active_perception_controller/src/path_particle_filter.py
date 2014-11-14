@@ -11,6 +11,7 @@ import cPickle as pickle
 print "+ scipy"
 import numpy as np
 import scipy.linalg
+import scipy.signal
 
 print "+ dirs"
 import roslib
@@ -45,13 +46,17 @@ def fix_angle(a):
 
 
 class PathParticleFilter:
+    # random sample injection
+    RANDOM_FRAC = 0 # 0.01
+
     points = None  # [index,coordinate]
     logprob = None  # [index]
     
     def __init__(self, cells, factor):
+        self.cells = cells
         n = cells.shape[1]
         total = int(math.ceil(factor*n))
-        samples = [tuple(cells[:,random.randint(0,n-1)]) for i in xrange(total)]
+        samples = [ tuple(cells[:,random.randint(0,n-1)]) for i in xrange(total) ]
         self.points = np.array(samples, dtype=int)
         self.logprob = np.zeros(total)
         #print "path: length=%s, took %s samples"%(n,total)
@@ -62,20 +67,40 @@ class PathParticleFilter:
 
     def resample(self):
         # get normalized probabilities
-        m = len(self.logprob)
+        n = int(math.ceil( self.RANDOM_FRAC*len(self.logprob) ))
+        m = len(self.logprob) - n
         w = np.exp(self.logprob)
         w /= w.sum()
-        # determine indices of new samples
+        # re-sample m samples
         si  = scipy.linalg.toeplitz(w, np.zeros_like(w)).sum(axis=1)
         rj  = (np.random.random() + np.arange(m)) / m
         dij = si[:,None] - rj[None,:]
         dij[dij<0] = np.inf
         k   = dij.argmin(axis=0)
-        # replace particles and update weights
-        self.points = self.points[k]
+        resampled = self.points[k]
+        if n>0:
+            # generate n new samples
+            total = self.cells.shape[1]
+            samples = [ tuple(self.cells[:,random.randint(0,total-1)]) for i in xrange(n) ]
+            new = np.array(samples, dtype=int)
+            self.points = np.vstack((resampled, new))
+        else:
+            self.points = resampled
         self.logprob = np.zeros(len(self.points))
-    
+
+    # TODO:
+    def diffusion(self):
+        raise Exception, "Not yet implemented"
+
 class MapParticleModel:
+    # Gaussian FIR for occupied cells observation model
+    SIZE = 3
+    VARIANCE = 1.5**2
+    occkernel = np.exp( -np.arange(-SIZE,SIZE+1)**2 / (2*VARIANCE) )
+    # observation model
+    OCC_LOGPROB  =  5.0
+    FREE_LOGPROB = -1.0
+
     filters = None
     paths = cells = None
     
@@ -276,21 +301,27 @@ class MapParticleModel:
         wh  = imax - imin + 1
         # win is a map window containing the log prob of occupancy for each cell
         win = np.zeros((wh, ww))
-        win[imfree-imin, jmfree-jmin] = -1
+
+        # place dirac functions on occupied cells
+        win[ imocc-imin, jmocc-jmin ] = self.OCC_LOGPROB
+        # convolve with a separable FIR kernel
+        win = scipy.signal.sepfir2d(win, self.occkernel, self.occkernel)
+        # reduce log prob of free cells
+        win[imfree-imin, jmfree-jmin] += self.FREE_LOGPROB
 
         # hacking I
         # win[ imocc-imin, jmocc-jmin ] = +1
 
         # hacking II
-        kernel = np.array([[0.5, 1.0, 0.5],
-                           [1.0, 1.0, 1.0],
-                           [0.5, 1.0, 0.5]])
-        for i in xrange(3):
-            for j in xrange(3):
-                u = imocc-imin -1+i
-                v = jmocc-jmin -1+j
-                valid = (u>=0) & (u<wh) & (v>=0) & (v<ww)
-                win[ u[valid], v[valid] ] = kernel[i,j]
+        # kernel = np.array([[0.5, 1.0, 0.5],
+        #                    [1.0, 1.0, 1.0],
+        #                    [0.5, 1.0, 0.5]])
+        # for i in xrange(3):
+        #     for j in xrange(3):
+        #         u = imocc-imin -1+i
+        #         v = jmocc-jmin -1+j
+        #         valid = (u>=0) & (u<wh) & (v>=0) & (v<ww)
+        #         win[ u[valid], v[valid] ] = kernel[i,j]
 
         # determine log prob increments for swept cells
         def importance(points):
@@ -559,7 +590,7 @@ def test6(state="path_filters.state"):
     publish_particles()
     while not rospy.is_shutdown():
         for (frame,(pose,scan)) in scans.iteritems():
-            print "-- got scan at", frame
+            print "-- got scan from", frame
             #
             t1 = time.time()
             mpm.compute_importance(scan, pose)
@@ -567,7 +598,7 @@ def test6(state="path_filters.state"):
             #
             print "[compute_importance took %f ms]"%(1000*(t2-t1))
             t1 = time.time()
-            #mpm.resample()
+            mpm.resample()
             t2 = time.time()
             #
             print "[resample took %f ms]"%(1000*(t2-t1))
