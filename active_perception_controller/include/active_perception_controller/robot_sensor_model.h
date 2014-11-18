@@ -22,18 +22,15 @@ namespace optimization
 class RobotSensorModel
 {
 public:
-    RobotSensorModel(const std::string& map_path,
-                   const nav_msgs::MapMetaData& map_metadata);
+    RobotSensorModel(const std::string& lfield_path);
 
-    void applySensorModel(const sensor_msgs::PointCloud& particle_set,
-                          nav_msgs::OccupancyGrid& map);
-    void applySensorModel(const geometry_msgs::Point32& particle,
-                          nav_msgs::OccupancyGrid& map);
+    void applySensorModel(size_t cell_x,
+                          size_t cell_y,
+                          UtilityMap<UtilityIntervalMapCell>* global_umap);
 private:
-    cv::SparseMat sensor_map_;
-    nav_msgs::MapMetaData map_metadata_;
+    UtilityMap<UtilityIntervalMapCell>* lh_interval_map_;
 };
 }
 
 
-#endif /* SENSOR_MODEL_MASK_H_ */
+#endif /* ROBOT_SENSOR_MODEL_H_ */

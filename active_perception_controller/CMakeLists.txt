@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(active_perception_controller)
 
-#set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Debug)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
@@ -10,6 +10,7 @@ find_package(catkin REQUIRED roscpp geometry_msgs std_msgs nav_msgs roslib)
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 find_package( OpenCV REQUIRED )
+# find_package( OMPL REQUIRED )
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -89,7 +90,7 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-include_directories(include ${OpenCV_INCLUDE_DIRS})
+include_directories(include ${OpenCV_INCLUDE_DIRS} ${ompl_INCLUDE_DIRS})
 
 ## Declare a cpp library
 # add_library(active_perception_controller
@@ -97,19 +98,17 @@ include_directories(include ${OpenCV_INCLUDE_DIRS})
 # )
 
 ## Declare a cpp executable
-add_executable(optimization_node src/optimization_node.cpp 
-								 src/optimizer.cpp 
-								 src/robot_sensor_model.cpp
-								 src/robot_motion_model.cpp)
+# add_executable(optimization_node src/optimization_node.cpp 
+# 								 src/motion_planner.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(active_perception_controller_node active_perception_controller_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(optimization_node
-                      gsl gslcblas ${catkin_LIBRARIES}
-                      ${OpenCV_LIBRARIES})
+# target_link_libraries(optimization_node
+#                      gsl gslcblas ${catkin_LIBRARIES}
+#                      ${OpenCV_LIBRARIES} ${OMPL_LIBRARIES} ${OMPLAPP_LIBRARIES})
 
 add_executable(person_estimator src/person_estimator.cpp src/particle_filter.cpp src/person_particle_filter.cpp)
 target_link_libraries(person_estimator gsl gslcblas ${catkin_LIBRARIES})

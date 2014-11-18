@@ -6,11 +6,11 @@
 
     <include file="$(find stage_simulation)/launch/stage.launch"/>
     <include file="$(find stage_simulation)/launch/amcl.launch" />
-    <node pkg="active_perception_controller" type="optimization_node" name="optimization_node" output="screen"/>
+    <!--node pkg="active_perception_controller" type="motion_planner.py" name="entropy_motion_planner" output="screen"/-->
     <node pkg="active_perception_controller" type="person_estimator" name="estimator">
     </node>
     
-    <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+    <!--node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
         <rosparam file="$(find stage_simulation)/config/costmap_common_params_stage.yaml" command="load" ns="global_costmap" />
         <rosparam file="$(find stage_simulation)/config/costmap_common_params_stage.yaml" command="load" ns="local_costmap" />
         <rosparam file="$(find stage_simulation)/config/local_costmap_params.yaml" command="load" />
@@ -24,5 +24,5 @@
         <param name="planner_patience" type="double" value="2.0"/>
         <param name="controller_patience" type="double" value="60.0"/>
         <remap from="map" to="/map"/>
-    </node>
+    </node-->
 </launch>
