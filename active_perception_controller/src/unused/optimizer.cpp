@@ -16,7 +16,8 @@ nav_map_metadata_sub_ ( nh_.subscribe ( "map_metadata", 10, &Optimizer::navMapMe
 cmd_vel_pub_ ( nh_.advertise<Twist> ( "cmd_vel", 10 ) ),
 predicted_particles_pub_ ( nh_.advertise<PoseArray> ( "predicted_particle_cloud", 10 ) ),
 cost_map_pub_ ( nh_.advertise<OccupancyGrid> ( "optimizer_cost_map", 10 ) ),
-rsm_ (NULL)
+rsm_ (NULL),
+umap_ (NULL)
 {
     double alpha_v, alpha_vxy, alpha_vw, alpha_wv, alpha_w, alpha_vg, alpha_wg;
     if(nh_.getParam("alpha_v", alpha_v)) rmm_.alpha_v = alpha_v;
@@ -36,9 +37,28 @@ personParticleCloudCallback(const PointCloudConstPtr& msg)
     if(rsm_ != NULL)
     {
         person_particles_ = *msg;
-        OccupancyGrid map;
-        rsm_->applySensorModel(person_particles_,map);
-        cost_map_pub_.publish(map);
+        umap_->clear();
+
+        for(size_t i = 0; i < person_particles_.points.size(); i++)
+        {
+            Point32 p = person_particles_.points[i];
+            size_t cell_x = floor((p.x - nav_map_metadata_.origin.position.x)
+                                              /nav_map_metadata_.resolution);
+            size_t cell_y = floor((p.y - nav_map_metadata_.origin.position.y)
+                                              /nav_map_metadata_.resolution);
+            rsm_->applySensorModel(cell_x, cell_y, umap_);
+//            ROS_INFO_STREAM("Processing particle " << i << " out of " << person_particles_.points.size());
+        }
+
+        OccupancyGrid occgrid;
+        occgrid.header.frame_id = "/map";
+        occgrid.info.resolution = nav_map_metadata_.resolution;
+        occgrid.info.width = umap_->getWidth();
+        occgrid.info.height = umap_->getHeight();
+        occgrid.info.origin = nav_map_metadata_.origin;
+        ROS_INFO_STREAM("Going to publish map");
+        umap_->getMaximumUtilityMap(occgrid);
+        cost_map_pub_.publish(occgrid);
     }
 }
 
@@ -79,8 +99,22 @@ void
 Optimizer::
 navMapMetaDataCallback(const MapMetaDataConstPtr& msg)
 {
-    string path = ros::package::getPath("active_perception_controller");
-    rsm_ = new RobotSensorModel(path+"/config/sensormodel.png", *msg);
+    string package_path = ros::package::getPath("active_perception_controller");
+    nav_map_metadata_ = *msg;
+    string model_path = "/config/sensormodel.png";
+    double model_resolution = 0.1034,
+           umap_resolution = msg->resolution;
+    nh_.getParam("sensor_likelihood_field_path", model_path);
+    nh_.getParam("sensor_likelihood_field_resolution", model_resolution);
+    nh_.getParam("costmap_resolution", umap_resolution);
+    string full_path = package_path + model_path;
+    rsm_ = new RobotSensorModel(full_path);
+    double nav_width = msg->width/msg->resolution,
+           nav_height = msg->height/msg->resolution;
+    size_t cell_width = round(nav_width*umap_resolution),
+           cell_height = round(nav_height*umap_resolution);
+
+    umap_ = new UtilityMap<UtilityIntervalMapCell>(cell_width, cell_height);
 }
 
 void

@@ -1,6 +1,6 @@
 #include <ros/ros.h>
 
-#include <active_perception_controller/optimizer.h>
+#include <active_perception_controller/motion_planner.h>
 
 using namespace ros;
 using namespace std;
@@ -9,7 +9,7 @@ int main ( int argc, char** argv )
 {
     init ( argc, argv, "optimization_node" );
     
-    optimization::Optimizer opt;
+    MotionPlanner mp;
     
     spin();
     

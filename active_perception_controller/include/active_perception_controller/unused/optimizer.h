@@ -15,6 +15,7 @@
 
 #include <active_perception_controller/robot_motion_model.h>
 #include <active_perception_controller/robot_sensor_model.h>
+#include <active_perception_controller/utility_map.h>
 
 #define DEBUG 1
 
@@ -59,8 +60,10 @@ private:
     geometry_msgs::Twist robot_vel_;
     geometry_msgs::PoseArray robot_particles_;
     sensor_msgs::PointCloud person_particles_;
+    nav_msgs::MapMetaData nav_map_metadata_;
     RobotMotionModel rmm_;
     RobotSensorModel* rsm_;
+    UtilityMap<UtilityIntervalMapCell>* umap_;
 };
 }
 
