@@ -1,4 +1,6 @@
 #include <active_perception_controller/person_particle_filter.h>
+#include <active_perception_controller/sensor_model.h>
+
 #include <cstdlib>
 
 #define FILTER_ON_PREDICTION 0
@@ -25,11 +27,11 @@ PersonParticle::PersonParticle(const PersonParticle &person_particle)
    \param n_particles Number of particles
    \param map Occupancy map
    \param sigma_pose Standard deviation of person movement noise
-   \param d_threshold Distance threshold to detect RFID tag
-   \param prob_positive_det Detection probability within range
-   \param prob_false_det Detection probability out of range
+   \param rfid_map_res Resolution of RFID maps
+   \param rfid_prob_pos Probability map for positive RFID
+   \param rfid_prob_neg Probability map for negative RFID
   */
-PersonParticleFilter::PersonParticleFilter(int n_particles, nav_msgs::OccupancyGrid const* map, double sigma_pose, double d_threshold, double prob_positive_det, double prob_false_det):ParticleFilter(map)
+PersonParticleFilter::PersonParticleFilter(int n_particles, nav_msgs::OccupancyGrid const* map, double sigma_pose, double rfid_map_res, string rfid_prob_pos, string rfid_prob_neg):ParticleFilter(map)
 {
     for(int i = 0; i < n_particles; i++)
     {
@@ -37,9 +39,8 @@ PersonParticleFilter::PersonParticleFilter(int n_particles, nav_msgs::OccupancyG
     }
 
     sigma_pose_ = sigma_pose;
-    d_threshold_ = d_threshold;
-    prob_positive_det_ = prob_positive_det;
-    prob_false_det_ = prob_false_det;
+
+    rfid_model_ = new RfidSensorModel(rfid_prob_pos, rfid_prob_neg, rfid_map_res);
 }
 
 /** Destructor
@@ -50,6 +51,8 @@ PersonParticleFilter::~PersonParticleFilter()
     {
         delete ((PersonParticle *)(particles_[i]));
     }
+
+    delete rfid_model_;
 }
 
 /** Draw particles from a uniform distribution
@@ -68,6 +71,7 @@ void PersonParticleFilter::initUniform()
 
         part_ptr->pose_[0] = map_->info.origin.position.x + map_->info.resolution * free_point.first;
         part_ptr->pose_[1] = - (map_->info.origin.position.y + map_->info.resolution * (map_->info.height - free_point.second));
+        part_ptr->weight_ = 1.0/num_particles;
     }
 }
 
@@ -97,30 +101,24 @@ void PersonParticleFilter::predict(double timeStep)
     }
 }
 
-/** Update particles with new RFID measure
-  \param rfid_mes RFID measure
-  \param robot_x Current robot pose
-  \param robot_y Current robot pose
-  \param robot_x_cov Covariance
-  \param robot_y_cov Covariance
+/** Update particles with new observation
+  \param obs_data Observation
   */
-void PersonParticleFilter::update(bool &rfid_mes, double &robot_x, double &robot_y, double &robot_x_cov, double &robot_y_cov)
+void PersonParticleFilter::update(SensorData &obs_data)
 {
     double total_weight = 0.0;
 
-    // Update weights
+    // Update weights. We assume all observations are from RFID sensor
     for(int i = 0; i < particles_.size(); i++)
     {
-        PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);
-        part_ptr->weight_ = computeObsProb(rfid_mes, robot_x, robot_y, robot_x_cov, robot_y_cov, part_ptr->pose_[0], part_ptr->pose_[1]);
-        total_weight += part_ptr->weight_;
+        particles_[i]->weight_ = rfid_model_->applySensorModel(obs_data, particles_[i]);
+        total_weight += particles_[i]->weight_;
     }
 
     // Normalize weights
     for(int i = 0; i < particles_.size(); i++)
     {
-        PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);
-        part_ptr->weight_ = part_ptr->weight_/total_weight;
+       particles_[i]->weight_ = particles_[i]->weight_/total_weight;
     }
 }
 
@@ -160,6 +158,36 @@ void PersonParticleFilter::resample()
     }
 }
 
+/** Initialize filter with a specific set of particles
+  \param particle_set Particle set to initialize
+  */
+void PersonParticleFilter::initFromParticles(sensor_msgs::PointCloud &particle_set)
+{
+    int num_particles = particle_set.points.size();
+
+    if(particles_.size() != num_particles)
+    {
+        particles_.resize(num_particles);
+    }
+
+    // Look for the channel with weights
+    int weights_channel = 0;
+    while(particle_set.channels[weights_channel].name.c_str() != "weights")
+    {
+        weights_channel++;
+    }
+
+    // Copy particles from particle set
+    for(int i = 0; i < num_particles; i++)
+    {
+        PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);
+
+        part_ptr->pose_[0] = particle_set.points[i].x;
+        part_ptr->pose_[1] = particle_set.points[i].y;
+        part_ptr->weight_ = particle_set.channels[weights_channel].values[i];
+    }
+}
+
 /** Compute the probability of obtaining an RFID measure given a reader and emitter
   \param rfid_mes RFID measure
   \param x_r Reader position
@@ -169,6 +197,7 @@ void PersonParticleFilter::resample()
   \param x_e Emitter position
   \param y_e Emitter position
   */
+/*
 double PersonParticleFilter::computeObsProb(bool &rfid_mes, double x_r, double y_r, double x_r_cov, double y_r_cov, double x_e, double y_e)
 {
 
@@ -201,6 +230,6 @@ double PersonParticleFilter::computeObsProb(bool &rfid_mes, double x_r, double y
     }
     return obs_prob;
 }
-
+*/
 
 

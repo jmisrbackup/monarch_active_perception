@@ -3,11 +3,12 @@
 
 #include <ros/ros.h>
 #include <nav_msgs/OccupancyGrid.h>
-
 #include <gsl/gsl_rng.h>
 #include <vector>
 
 using namespace std;
+
+class SensorData;
 
 /** \brief Information for a single particle
 
@@ -34,7 +35,7 @@ public:
     Particle* getParticle(int particle_id);
     virtual void initUniform() = 0;
     virtual void predict(double timeStep) = 0;
-    virtual void update(){};
+    virtual void update(SensorData &obs_data){};
     virtual void resample() = 0;
     vector<int> calcResampledSet();
     void setMap(const nav_msgs::OccupancyGridConstPtr& map);

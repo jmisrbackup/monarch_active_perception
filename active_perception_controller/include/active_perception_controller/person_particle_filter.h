@@ -1,11 +1,14 @@
 #ifndef PERSON_PARTICLE_FILTER_H
 #define PERSON_PARTICLE_FILTER_H
 
-#include "geometry_msgs/PoseArray.h"
-#include "particle_filter.h"
+#include <geometry_msgs/PoseArray.h>
+#include <sensor_msgs/PointCloud.h>
+#include <active_perception_controller/particle_filter.h>
+#include <active_perception_controller/rfid_sensor_model.h>
 
 #include <gsl/gsl_randist.h>
 #include <vector>
+#include <string>
 
 using namespace std;
 
@@ -27,13 +30,15 @@ public:
 class PersonParticleFilter : public ParticleFilter
 {
 public:
-    PersonParticleFilter(int n_particles, nav_msgs::OccupancyGrid const* map, double sigma_pose, double d_threshold, double prob_positive_det, double prob_false_det);
+    PersonParticleFilter(int n_particles, nav_msgs::OccupancyGrid const* map, double sigma_pose, double rfid_map_res, string rfid_prob_pos, string rfid_prob_neg);
     ~PersonParticleFilter();
 
     void initUniform();
     void predict(double timeStep);
-    void update(bool &rfid_mes, double &robot_x, double &robot_y, double &robot_x_cov, double &robot_y_cov);
+    void update(SensorData &obs_data);
     void resample();
+
+    void initFromParticles(sensor_msgs::PointCloud &particle_set);
 
 protected:
     double sigma_pose_;             ///< Starndard deviation for person movement
@@ -41,7 +46,7 @@ protected:
     double prob_positive_det_;      ///< Detection probability within range
     double prob_false_det_;         ///< Detection probability out of range
 
-    double computeObsProb(bool &rfid_mes, double x_r, double y_r, double x_r_cov, double y_r_cov, double x_e, double y_e);
+    RfidSensorModel *rfid_model_;   ///< Probability model for RFID observations
 };
 
 
