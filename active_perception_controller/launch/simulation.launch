@@ -6,9 +6,17 @@
 
     <include file="$(find stage_simulation)/launch/stage.launch"/>
     <include file="$(find stage_simulation)/launch/amcl.launch" />
-    <!--node pkg="active_perception_controller" type="motion_planner.py" name="entropy_motion_planner" output="screen"/-->
+    
     <node pkg="active_perception_controller" type="person_estimator" name="estimator">
+	<param name="step_duration" type="double" value="0.2" />
+	<param name="num_particles" type="int" value="5000" />
+	<param name="sigma_person" type="double" value="0.05" />
+	<param name="rfid_map_resolution" type="double" value="0.06" />
+	<param name="rfid_prob_map" type="string" value="$(find active_perception_controller)/config/sensormodel.png" />
+
     </node>
+
+    <!--node pkg="active_perception_controller" type="motion_planner.py" name="entropy_motion_planner" output="screen"/-->
     
     <!--node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
         <rosparam file="$(find stage_simulation)/config/costmap_common_params_stage.yaml" command="load" ns="global_costmap" />
