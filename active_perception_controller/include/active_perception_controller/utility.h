@@ -11,7 +11,7 @@
 class Utility
 {
 public:
-    static double computeEntropyGain(sensor_msgs::PointCloud person_particles, geometry_msgs::PoseWithCovariance robot_pose);
+    static double computeInfoGain(sensor_msgs::PointCloud person_particles, geometry_msgs::PoseWithCovariance robot_pose);
 };
 
 #endif

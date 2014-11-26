@@ -65,8 +65,7 @@ PersonEstimator::PersonEstimator()
     ros::NodeHandle private_nh("~");
     double sigma_person;
     double rfid_map_res;
-    string rfid_prob_pos;
-    string rfid_prob_neg;
+    string rfid_prob_map;
 
 
     // Read parameters
@@ -76,8 +75,7 @@ PersonEstimator::PersonEstimator()
     private_nh.param("global_frame_id", global_frame_id_, string("map"));
 
     if(!private_nh.getParam("rfid_map_resolution", rfid_map_res)
-            || !private_nh.getParam("rfid_map_pos", rfid_prob_pos)
-            || !private_nh.getParam("rfid_map_neg", rfid_prob_neg))
+            || !private_nh.getParam("rfid_prob_map", rfid_prob_map))
     {
         ROS_ERROR("No correct sensor model for RFID");
     }
@@ -91,7 +89,7 @@ PersonEstimator::PersonEstimator()
     // Read the map
     requestMap();
 
-    person_pf_ = new PersonParticleFilter(num_particles_, &map_, sigma_person, rfid_map_res, rfid_prob_pos, rfid_prob_neg);
+    person_pf_ = new PersonParticleFilter(num_particles_, &map_, sigma_person, rfid_map_res, rfid_prob_map);
 
     first_rob_pose_ = false;
     new_measure_ = false;

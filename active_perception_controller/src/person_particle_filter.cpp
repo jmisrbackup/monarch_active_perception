@@ -28,10 +28,9 @@ PersonParticle::PersonParticle(const PersonParticle &person_particle)
    \param map Occupancy map
    \param sigma_pose Standard deviation of person movement noise
    \param rfid_map_res Resolution of RFID maps
-   \param rfid_prob_pos Probability map for positive RFID
-   \param rfid_prob_neg Probability map for negative RFID
+   \param rfid_prob_map Probability map for positive RFID
   */
-PersonParticleFilter::PersonParticleFilter(int n_particles, nav_msgs::OccupancyGrid const* map, double sigma_pose, double rfid_map_res, string rfid_prob_pos, string rfid_prob_neg):ParticleFilter(map)
+PersonParticleFilter::PersonParticleFilter(int n_particles, nav_msgs::OccupancyGrid const* map, double sigma_pose, double rfid_map_res, string rfid_prob_map):ParticleFilter(map)
 {
     for(int i = 0; i < n_particles; i++)
     {
@@ -40,7 +39,7 @@ PersonParticleFilter::PersonParticleFilter(int n_particles, nav_msgs::OccupancyG
 
     sigma_pose_ = sigma_pose;
 
-    rfid_model_ = new RfidSensorModel(rfid_prob_pos, rfid_prob_neg, rfid_map_res);
+    rfid_model_ = new RfidSensorModel(rfid_prob_map, rfid_map_res);
 }
 
 /** Destructor
@@ -156,6 +155,25 @@ void PersonParticleFilter::resample()
         PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);
         part_ptr->weight_ = part_ptr->weight_/total_weight;
     }
+}
+
+/** Compute entropy of probability distribution as an approximation from the particles
+  */
+double PersonParticleFilter::entropyParticles()
+{
+    // Eq. 14 from paper "Particle Filter Based Entropy" by Boers, Driessen, Bagchi and Mandal
+
+    return 0.0;
+}
+
+/** Compute entropy of probability distribution as an approximation. The approximation is based on a bound for
+ the entropy of a Gaussian Mixture Model. The set of particles can be approximated as a GMM.
+  */
+double PersonParticleFilter::entropyGMM()
+{
+    // Eq. 12 from paper "Active Sensing for Range-Only Mapping using Multiple Hypothesis" by L. Merino, F. Caballero and A. Ollero.
+
+    return 0.0;
 }
 
 /** Initialize filter with a specific set of particles

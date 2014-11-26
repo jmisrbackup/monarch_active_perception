@@ -24,21 +24,20 @@ public:
     geometry_msgs::PoseWithCovariance pose_;            ///< Pose of the RFID sensor
 };
 
-/** RFID sensor model. The model is loaded from a couple of images that give the probability of observation.
-  One image gives the probability of positive observation and another for negative observation. The images
-  represent the field of view of the RFID sensor, which is assumed to be at the center.
+/** RFID sensor model. The model is loaded from an images that gives the probability of positive observation for each point.
+  The image represents the field of view of the RFID sensor, which is assumed to be at the center.
   */
 class RfidSensorModel: public SensorModel
 {
 public:
-    RfidSensorModel(const std::string& pos_image_path, const std::string& neg_image_path, double resolution);
+    RfidSensorModel(const std::string& prob_image_path, double resolution);
 
     double applySensorModel(SensorData &obs_data, const Particle *particle);
 
 private:
     double map_resolution_;     ///< Resolution of map in meter/pixel
-    cv::Mat map_image_pos_;     ///< Map for positive observation
-    cv::Mat map_image_neg_;     ///< Map for negative observation
+    cv::Mat prob_map_;           ///< Map of observation probability
+
 };
 
 #endif /* RFID_SENSOR_MODEL_H_ */

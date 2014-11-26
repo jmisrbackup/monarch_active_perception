@@ -112,7 +112,7 @@ include_directories(include ${OpenCV_INCLUDE_DIRS} ${ompl_INCLUDE_DIRS})
 
 file(GLOB hdrs "include/active_perception_controller/*.h")
 
-add_executable(person_estimator src/person_estimator.cpp src/particle_filter.cpp src/person_particle_filter.cpp src/rfid_sensor_model.cpp ${hdrs})
+add_executable(person_estimator src/person_estimator.cpp src/particle_filter.cpp src/person_particle_filter.cpp src/rfid_sensor_model.cpp src/utility.cpp ${hdrs})
 target_link_libraries(person_estimator gsl gslcblas ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 #############

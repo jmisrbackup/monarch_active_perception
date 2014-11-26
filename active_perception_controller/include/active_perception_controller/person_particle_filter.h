@@ -30,13 +30,15 @@ public:
 class PersonParticleFilter : public ParticleFilter
 {
 public:
-    PersonParticleFilter(int n_particles, nav_msgs::OccupancyGrid const* map, double sigma_pose, double rfid_map_res, string rfid_prob_pos, string rfid_prob_neg);
+    PersonParticleFilter(int n_particles, nav_msgs::OccupancyGrid const* map, double sigma_pose, double rfid_map_res, string rfid_prob_map);
     ~PersonParticleFilter();
 
     void initUniform();
     void predict(double timeStep);
     void update(SensorData &obs_data);
     void resample();
+    double entropyParticles();
+    double entropyGMM();
 
     void initFromParticles(sensor_msgs::PointCloud &particle_set);
 

@@ -37,6 +37,8 @@ public:
     virtual void predict(double timeStep) = 0;
     virtual void update(SensorData &obs_data){};
     virtual void resample() = 0;
+    virtual double entropyParticles(){};
+    virtual double entropyGMM(){};
     vector<int> calcResampledSet();
     void setMap(const nav_msgs::OccupancyGridConstPtr& map);
 

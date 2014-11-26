@@ -10,18 +10,30 @@
 
 
 /** Constructor
-  \param pos_image_path Image for positive probability model
-  \param neg_image_path Image for negative probability model
+  \param image_path Image for positive probability model
   \param resolution Resolution of probability maps
   */
-RfidSensorModel::RfidSensorModel(const std::string& pos_image_path, const std::string& neg_image_path, double resolution)
+RfidSensorModel::RfidSensorModel(const std::string& image_path, double resolution)
 {
     map_resolution_ = resolution;
 
-    map_image_pos_ = cv::imread(pos_image_path, CV_LOAD_IMAGE_GRAYSCALE);
-    map_image_neg_ = cv::imread(neg_image_path, CV_LOAD_IMAGE_GRAYSCALE);
+    prob_map_ = cv::imread(image_path, CV_LOAD_IMAGE_GRAYSCALE);
+}
 
+/** Apply the sensor model to obtain the probability of an observation for a given particle
+  \param obs_data Observation
+  \param particle Particle
+  */
+double RfidSensorModel::applySensorModel(SensorData &obs_data, const Particle *particle)
+{
+    RfidSensorData *rfid_data = (RfidSensorData *)&obs_data;
+    PersonParticle *particle_data = (PersonParticle *)particle;
 
+    /*
+      3d particle = Rot*2d_vector + translation
+      2d_vector = Rot-1(3d_particle - translation_robot)
+      From the 2d_vector the pixels on the images are computed and the element checked for probability
+      */
     /*
     bool found = false;
     double range = 0;
@@ -60,16 +72,6 @@ RfidSensorModel::RfidSensorModel(const std::string& pos_image_path, const std::s
     }
     */
 
-}
-
-/** Apply the sensor model to obtain the probability of an observation for a given particle
-  \param obs_data Observation
-  \param particle Particle
-  */
-double RfidSensorModel::applySensorModel(SensorData &obs_data, const Particle *particle)
-{
-    RfidSensorData *rfid_data = (RfidSensorData *)&obs_data;
-    PersonParticle *particle_data = (PersonParticle *)particle;
 
     return 0.0;
 }
