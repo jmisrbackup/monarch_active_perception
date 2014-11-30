@@ -30,6 +30,7 @@ public:
 class PersonParticleFilter : public ParticleFilter
 {
 public:
+    PersonParticleFilter(int n_particles);
     PersonParticleFilter(int n_particles, nav_msgs::OccupancyGrid const* map, double sigma_pose, double rfid_map_res, string rfid_prob_map);
     ~PersonParticleFilter();
 
@@ -37,6 +38,7 @@ public:
     void predict(double timeStep);
     void update(SensorData &obs_data);
     void resample();
+    void setSensorModel(RfidSensorModel *model);
     double entropyParticles();
     double entropyGMM();
 
@@ -44,11 +46,9 @@ public:
 
 protected:
     double sigma_pose_;             ///< Starndard deviation for person movement
-    double d_threshold_;            ///< Distance threshold to detect RFID tag
-    double prob_positive_det_;      ///< Detection probability within range
-    double prob_false_det_;         ///< Detection probability out of range
-
     RfidSensorModel *rfid_model_;   ///< Probability model for RFID observations
+    bool local_sensor_;             ///< True if the sensor model is created locally
+    bool external_sensor_;          ///< True if an external sensor model is loaded
 };
 
 

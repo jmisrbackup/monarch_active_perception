@@ -1,7 +1,9 @@
+#define _USE_MATH_DEFINES
+#include <cmath>
+#include <cstdlib>
+
 #include <active_perception_controller/person_particle_filter.h>
 #include <active_perception_controller/sensor_model.h>
-
-#include <cstdlib>
 
 #define FILTER_ON_PREDICTION 0
 
@@ -25,6 +27,19 @@ PersonParticle::PersonParticle(const PersonParticle &person_particle)
 
 /** Constructor
    \param n_particles Number of particles
+  */
+PersonParticleFilter::PersonParticleFilter(int n_particles):ParticleFilter()
+{
+    for(int i = 0; i < n_particles; i++)
+    {
+        particles_.push_back(new PersonParticle());
+    }
+    local_sensor_ = false;
+    external_sensor_ = false;
+}
+
+/** Constructor
+   \param n_particles Number of particles
    \param map Occupancy map
    \param sigma_pose Standard deviation of person movement noise
    \param rfid_map_res Resolution of RFID maps
@@ -40,6 +55,8 @@ PersonParticleFilter::PersonParticleFilter(int n_particles, nav_msgs::OccupancyG
     sigma_pose_ = sigma_pose;
 
     rfid_model_ = new RfidSensorModel(rfid_prob_map, rfid_map_res);
+    local_sensor_ = true;
+    external_sensor_ = false;
 }
 
 /** Destructor
@@ -51,26 +68,34 @@ PersonParticleFilter::~PersonParticleFilter()
         delete ((PersonParticle *)(particles_[i]));
     }
 
-    delete rfid_model_;
+    if(local_sensor_)
+        delete rfid_model_;
 }
 
 /** Draw particles from a uniform distribution
   */
 void PersonParticleFilter::initUniform()
 {
-    // Draw only particles from free space
-    int num_particles = particles_.size();
-
-    for(int i = 0; i < num_particles; i++)
+    if(map_ != NULL)
     {
-        unsigned int rand_index = gsl_rng_uniform(ran_generator_)* free_space_ind_.size();
-        std::pair<int,int> free_point = free_space_ind_[rand_index];
+        // Draw only particles from free space
+        int num_particles = particles_.size();
 
-        PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);
+        for(int i = 0; i < num_particles; i++)
+        {
+            unsigned int rand_index = gsl_rng_uniform(ran_generator_)* free_space_ind_.size();
+            std::pair<int,int> free_point = free_space_ind_[rand_index];
 
-        part_ptr->pose_[0] = map_->info.origin.position.x + map_->info.resolution * free_point.first;
-        part_ptr->pose_[1] = - (map_->info.origin.position.y + map_->info.resolution * (map_->info.height - free_point.second));
-        part_ptr->weight_ = 1.0/num_particles;
+            PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);
+
+            part_ptr->pose_[0] = map_->info.origin.position.x + map_->info.resolution * free_point.first;
+            part_ptr->pose_[1] = - (map_->info.origin.position.y + map_->info.resolution * (map_->info.height - free_point.second));
+            part_ptr->weight_ = 1.0/num_particles;
+        }
+    }
+    else
+    {
+        ROS_ERROR("Particle filter cannot be initialized as a uniform without a map");
     }
 }
 
@@ -87,13 +112,20 @@ void PersonParticleFilter::predict(double timeStep)
         double dx = gsl_ran_gaussian(ran_generator_, sigma_pose_);
         double dy = gsl_ran_gaussian(ran_generator_, sigma_pose_);
 #ifdef FILTER_ON_PREDICTION
-		size_t map_x = floor((part_ptr->pose_[0] + dx - map_->info.origin.position.x)/map_->info.resolution);
-		size_t map_y = floor((part_ptr->pose_[1] + dy + map_->info.origin.position.y)/map_->info.resolution + map_->info.height);
-		if(map_->data[map_y*map_->info.width + map_x] != 0) //occupied cell
-		{
-			dx = 0;
-			dy = 0;
-		}
+        if(map_ != NULL)
+        {
+            size_t map_x = floor((part_ptr->pose_[0] + dx - map_->info.origin.position.x)/map_->info.resolution);
+            size_t map_y = floor((part_ptr->pose_[1] + dy + map_->info.origin.position.y)/map_->info.resolution + map_->info.height);
+            if(map_->data[map_y*map_->info.width + map_x] != 0) //occupied cell
+            {
+                dx = 0;
+                dy = 0;
+            }
+        }
+        else
+        {
+            ROS_WARN("Prediction cannot be filtered out without a map");
+        }
 #endif
         part_ptr->pose_[0] += dx;
         part_ptr->pose_[1] += dy;
@@ -107,18 +139,23 @@ void PersonParticleFilter::update(SensorData &obs_data)
 {
     double total_weight = 0.0;
 
-    // Update weights. We assume all observations are from RFID sensor
-    for(int i = 0; i < particles_.size(); i++)
+    if(local_sensor_ || external_sensor_)
     {
-        particles_[i]->weight_ = rfid_model_->applySensorModel(obs_data, particles_[i]);
-        total_weight += particles_[i]->weight_;
-    }
+        // Update weights. We assume all observations are from RFID sensor
+        for(int i = 0; i < particles_.size(); i++)
+        {
+            particles_[i]->weight_ = rfid_model_->applySensorModel(obs_data, particles_[i]);
+            total_weight += particles_[i]->weight_;
+        }
 
-    // Normalize weights
-    for(int i = 0; i < particles_.size(); i++)
-    {
-       particles_[i]->weight_ = particles_[i]->weight_/total_weight;
+        // Normalize weights
+        for(int i = 0; i < particles_.size(); i++)
+        {
+           particles_[i]->weight_ = particles_[i]->weight_/total_weight;
+        }
     }
+    else
+        ROS_ERROR("Filter has no sensor model to update");
 }
 
 /** Resample the current set of particles according to the probability distribution
@@ -157,23 +194,55 @@ void PersonParticleFilter::resample()
     }
 }
 
-/** Compute entropy of probability distribution as an approximation from the particles
+/**
+  Set external sensor model for particle filter
+  \param model New model
+  */
+void PersonParticleFilter::setSensorModel(RfidSensorModel *model)
+{
+    if(local_sensor_)
+    {
+        delete rfid_model_;
+        local_sensor_ = false;
+    }
+
+    external_sensor_ = true;
+    rfid_model_ = model;
+}
+
+/** \brief Compute entropy of probability distribution as an approximation from the particles.
+    Eq. 14 from paper "Particle Filter Based Entropy".
+    By Boers, Driessen, Bagchi and Mandal.
   */
 double PersonParticleFilter::entropyParticles()
 {
-    // Eq. 14 from paper "Particle Filter Based Entropy" by Boers, Driessen, Bagchi and Mandal
 
     return 0.0;
 }
 
-/** Compute entropy of probability distribution as an approximation. The approximation is based on a bound for
- the entropy of a Gaussian Mixture Model. The set of particles can be approximated as a GMM.
+/** \brief Compute entropy of probability distribution as an approximation.
+ The approximation is based on a bound for the entropy of a Gaussian Mixture Model.
+ The set of particles can be approximated as a GMM.
+ Eq. 12 from paper "Active Sensing for Range-Only Mapping using Multiple Hypothesis".
+ By L. Merino, F. Caballero and A. Ollero.
   */
 double PersonParticleFilter::entropyGMM()
-{
-    // Eq. 12 from paper "Active Sensing for Range-Only Mapping using Multiple Hypothesis" by L. Merino, F. Caballero and A. Ollero.
+{   
+    double w;
+    double entropy = 0.0;
 
-    return 0.0;
+    if(sigma_pose_ > 0.0)
+    {
+        for(int i = 0; i < particles_.size(); i++)
+        {
+            w = particles_[i]->weight_;
+            entropy += w*(-log(w) + 0.5*log(pow(2*M_PI*exp(1),2)*pow(sigma_pose_,4)));
+        }
+    }
+    else
+        ROS_ERROR("Entropy cannot be computed without prediction model");
+
+    return entropy;
 }
 
 /** Initialize filter with a specific set of particles
@@ -205,49 +274,5 @@ void PersonParticleFilter::initFromParticles(sensor_msgs::PointCloud &particle_s
         part_ptr->weight_ = particle_set.channels[weights_channel].values[i];
     }
 }
-
-/** Compute the probability of obtaining an RFID measure given a reader and emitter
-  \param rfid_mes RFID measure
-  \param x_r Reader position
-  \param y_r Reader position
-  \param x_r_cov Covariance in robot position
-  \param y_r_cov Covariance in robot position
-  \param x_e Emitter position
-  \param y_e Emitter position
-  */
-/*
-double PersonParticleFilter::computeObsProb(bool &rfid_mes, double x_r, double y_r, double x_r_cov, double y_r_cov, double x_e, double y_e)
-{
-
-#ifndef FILTER_ON_PREDICTION
-	size_t map_x = floor((x_e - map_->info.origin.position.x)/map_->info.resolution);
-	size_t map_y = floor((y_e + map_->info.origin.position.y)/map_->info.resolution + map_->info.height);
-
-	if(map_->data[map_y*map_->info.width + map_x] != 0) //occupied cell
-	{
-		return 0.0;
-	}
-#endif
-
-    double obs_prob;
-    double distance = sqrt(((x_r-x_e)*(x_r-x_e)) + ((y_r-y_e)*(y_r-y_e)));
-
-    if(distance <= d_threshold_)
-    {
-        if(rfid_mes)
-            obs_prob = prob_positive_det_;
-        else
-            obs_prob = 1.0 - prob_positive_det_;
-    }
-    else
-    {
-        if(rfid_mes)
-            obs_prob = prob_false_det_;
-        else
-            obs_prob = 1.0 - prob_false_det_;
-    }
-    return obs_prob;
-}
-*/
 
 

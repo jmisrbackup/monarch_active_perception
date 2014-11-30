@@ -27,7 +27,7 @@ class ParticleFilter
 {
 public:
     ParticleFilter();
-    ParticleFilter(nav_msgs::OccupancyGrid const* map);
+    ParticleFilter(const nav_msgs::OccupancyGrid *map);
     ~ParticleFilter();
 
     int getNumParticles();
@@ -40,11 +40,11 @@ public:
     virtual double entropyParticles(){};
     virtual double entropyGMM(){};
     vector<int> calcResampledSet();
-    void setMap(const nav_msgs::OccupancyGridConstPtr& map);
+    void setMap(const nav_msgs::OccupancyGrid *map);
 
 protected:
     vector<Particle*> particles_;           ///< particle set.
-    nav_msgs::OccupancyGrid const *map_;
+    const nav_msgs::OccupancyGrid *map_;
     vector<pair<int,int> > free_space_ind_; ///< Map indices with free space
     gsl_rng *ran_generator_;                ///< Random number generator
 };

@@ -6,12 +6,13 @@ ParticleFilter::
 ParticleFilter
 ()
 {
+    map_ = NULL;
     ran_generator_ = gsl_rng_alloc(gsl_rng_taus);
 }
 
 ParticleFilter::
 ParticleFilter
-(nav_msgs::OccupancyGrid const *map)
+(const nav_msgs::OccupancyGrid *map)
 {
     map_ = map;
 
@@ -70,21 +71,33 @@ vector<int> ParticleFilter::calcResampledSet()
     double c, u, r;
     int num_samples = particles_.size();
 
-    r = gsl_rng_uniform(ran_generator_)*(1.0/num_samples);
-
-    int m, i;
-
-    i = 0;
-    c = particles_[0]->weight_;
-    for (int m = 0; m < num_samples; m++)
+    if(num_samples > 0)
     {
-      u = r + (m) * (1.0 / num_samples);
-      while (u > c)
-      {
-        i = i + 1;
-        c = c + particles_[i]->weight_;
-      }
-      resampled_set.push_back(i);
+        r = gsl_rng_uniform(ran_generator_)*(1.0/num_samples);
+
+        int m, i;
+
+        i = 0;
+        c = particles_[0]->weight_;
+        for (int m = 0; m < num_samples; m++)
+        {
+          u = r + (m) * (1.0 / num_samples);
+          while (u > c)
+          {
+            i = i + 1;
+            c = c + particles_[i]->weight_;
+          }
+          resampled_set.push_back(i);
+        }
     }
+
     return resampled_set;
+}
+
+/** Set an occupancy map for the filter
+  \param map New map
+  */
+void ParticleFilter::setMap(const nav_msgs::OccupancyGrid *map)
+{
+    map_ = map;
 }
