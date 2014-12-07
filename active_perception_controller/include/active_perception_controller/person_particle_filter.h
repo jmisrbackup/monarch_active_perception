@@ -45,10 +45,13 @@ public:
     void initFromParticles(sensor_msgs::PointCloud &particle_set);
 
 protected:
-    double sigma_pose_;             ///< Starndard deviation for person movement
-    RfidSensorModel *rfid_model_;   ///< Probability model for RFID observations
-    bool local_sensor_;             ///< True if the sensor model is created locally
-    bool external_sensor_;          ///< True if an external sensor model is loaded
+    double sigma_pose_;                 ///< Starndard deviation for person movement
+    RfidSensorModel *rfid_model_;       ///< Probability model for RFID observations
+    bool local_sensor_;                 ///< True if the sensor model is created locally
+    bool external_sensor_;              ///< True if an external sensor model is loaded
+    vector<double> prev_weights_;       ///< Weights of previous step
+    SensorData *last_obs_;              ///< Data from last observation updated
+    bool prev_step_info_;               ///< True if there is information from previous weights
 };
 
 

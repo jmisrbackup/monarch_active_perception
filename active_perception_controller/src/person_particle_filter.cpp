@@ -12,7 +12,7 @@
   */
 PersonParticle::PersonParticle()
 {
-    pose_.resize(2,0);
+    pose_.resize(2,0.0);
     weight_ = 0.0;
 }
 
@@ -36,6 +36,9 @@ PersonParticleFilter::PersonParticleFilter(int n_particles):ParticleFilter()
     }
     local_sensor_ = false;
     external_sensor_ = false;
+    prev_step_info_ = false;
+    prev_weights_.resize(n_particles,0.0);
+    last_obs_ = new RfidSensorData();
 }
 
 /** Constructor
@@ -57,6 +60,9 @@ PersonParticleFilter::PersonParticleFilter(int n_particles, nav_msgs::OccupancyG
     rfid_model_ = new RfidSensorModel(rfid_prob_map, rfid_map_res);
     local_sensor_ = true;
     external_sensor_ = false;
+    prev_step_info_ = false;
+    prev_weights_.resize(n_particles,0.0);
+    last_obs_ = new RfidSensorData();
 }
 
 /** Destructor
@@ -70,6 +76,8 @@ PersonParticleFilter::~PersonParticleFilter()
 
     if(local_sensor_)
         delete rfid_model_;
+
+    delete last_obs_;
 }
 
 /** Draw particles from a uniform distribution
@@ -109,6 +117,7 @@ void PersonParticleFilter::predict(double timeStep)
     for(int i = 0; i < num_particles; i++)
     {
         PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);
+
         double dx = gsl_ran_gaussian(ran_generator_, sigma_pose_);
         double dy = gsl_ran_gaussian(ran_generator_, sigma_pose_);
 #ifdef FILTER_ON_PREDICTION
@@ -127,6 +136,7 @@ void PersonParticleFilter::predict(double timeStep)
             ROS_WARN("Prediction cannot be filtered out without a map");
         }
 #endif
+
         part_ptr->pose_[0] += dx;
         part_ptr->pose_[1] += dy;
     }
@@ -144,6 +154,9 @@ void PersonParticleFilter::update(SensorData &obs_data)
         // Update weights. We assume all observations are from RFID sensor
         for(int i = 0; i < particles_.size(); i++)
         {
+            // Save previous information
+            prev_weights_[i] = particles_[i]->weight_;
+
             particles_[i]->weight_ = rfid_model_->applySensorModel(obs_data, particles_[i]);
             total_weight += particles_[i]->weight_;
         }
@@ -153,6 +166,12 @@ void PersonParticleFilter::update(SensorData &obs_data)
         {
            particles_[i]->weight_ = particles_[i]->weight_/total_weight;
         }
+
+        RfidSensorData *curr_obs = (RfidSensorData *)&obs_data;
+        RfidSensorData *prev_obs = (RfidSensorData *)last_obs_;
+        *prev_obs = *curr_obs;
+
+        prev_step_info_ = true;
     }
     else
         ROS_ERROR("Filter has no sensor model to update");
@@ -192,6 +211,8 @@ void PersonParticleFilter::resample()
         PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);
         part_ptr->weight_ = part_ptr->weight_/total_weight;
     }
+
+    prev_step_info_ = false;
 }
 
 /**
@@ -216,8 +237,38 @@ void PersonParticleFilter::setSensorModel(RfidSensorModel *model)
   */
 double PersonParticleFilter::entropyParticles()
 {
+    double entropy = 0.0;
 
-    return 0.0;
+    if(prev_step_info_)
+    {
+        if(local_sensor_ || external_sensor_)
+        {
+            double obs_prob;
+            double first_term = 0.0;
+            double second_term = 0.0;
+
+            /*
+              entropy = log{ Sum_{s_i in S}( p(s_i(k-1)) * p(z(k))|s_i(k)) )} -
+              Sum{s_i in S}( log{ p(z(k))|s_i(k)) } * p(s_i(k)) )
+              */
+
+            for(int i = 0; i < particles_.size(); i++)
+            {
+                obs_prob = rfid_model_->applySensorModel(*last_obs_, particles_[i]);
+                first_term += obs_prob*prev_weights_[i];
+
+                second_term += log(obs_prob)*particles_[i]->weight_;
+            }
+
+            entropy = log(first_term) - second_term;
+        }
+        else
+            ROS_ERROR("Entropy cannot be computed without a sensor model");
+    }
+    else
+        ROS_ERROR("Entropy cannot be computed without information from previous step");
+
+    return entropy;
 }
 
 /** \brief Compute entropy of probability distribution as an approximation.
