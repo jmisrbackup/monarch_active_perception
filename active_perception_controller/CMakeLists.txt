@@ -8,14 +8,14 @@ set(CMAKE_BUILD_TYPE Debug)
 find_package(catkin REQUIRED roscpp geometry_msgs std_msgs nav_msgs roslib)
 
 ## System dependencies are found with CMake's conventions
-# find_package(Boost REQUIRED COMPONENTS system)
+find_package( Boost REQUIRED COMPONENTS python )
+find_package( PythonLibs REQUIRED )
 find_package( OpenCV REQUIRED )
-# find_package( OMPL REQUIRED )
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
 ## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
-# catkin_python_setup()
+catkin_python_setup()
 
 ################################################
 ## Declare ROS messages, services and actions ##
@@ -79,7 +79,7 @@ find_package( OpenCV REQUIRED )
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
   INCLUDE_DIRS include
-#  LIBRARIES active_perception_controller
+  LIBRARIES ap_utility
 #  CATKIN_DEPENDS other_catkin_pkg
 #  DEPENDS system_lib
 )
@@ -90,12 +90,20 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-include_directories(include ${OpenCV_INCLUDE_DIRS} ${ompl_INCLUDE_DIRS})
+
+include_directories(include ${OpenCV_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS} )
 
 ## Declare a cpp library
-# add_library(active_perception_controller
-#   src/${PROJECT_NAME}/active_perception_controller.cpp
-# )
+add_library(ap_utility
+   src/utility.cpp src/person_estimator.cpp src/particle_filter.cpp src/person_particle_filter.cpp src/rfid_sensor_model.cpp
+)
+
+target_link_libraries(ap_utility gsl gslcblas ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${Boost_LIBRARIES} ${PYTHON_LIBRARIES})
+
+set_target_properties(ap_utility PROPERTIES
+        PREFIX ""
+        LIBRARY_OUTPUT_DIRECTORY ${CATKIN_DEVEL_PREFIX}/${CATKIN_PACKAGE_PYTHON_DESTINATION}
+        )
 
 ## Declare a cpp executable
 # add_executable(optimization_node src/optimization_node.cpp 
@@ -112,8 +120,8 @@ include_directories(include ${OpenCV_INCLUDE_DIRS} ${ompl_INCLUDE_DIRS})
 
 file(GLOB hdrs "include/active_perception_controller/*.h")
 
-add_executable(person_estimator src/person_estimator.cpp src/particle_filter.cpp src/person_particle_filter.cpp src/rfid_sensor_model.cpp src/utility.cpp ${hdrs})
-target_link_libraries(person_estimator gsl gslcblas ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+add_executable(person_estimator src/person_estimator.cpp src/particle_filter.cpp src/person_particle_filter.cpp src/rfid_sensor_model.cpp ${hdrs})
+target_link_libraries(person_estimator gsl gslcblas ap_utility)
 
 #############
 ## Install ##

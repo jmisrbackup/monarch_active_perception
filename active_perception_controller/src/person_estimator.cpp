@@ -81,7 +81,7 @@ PersonEstimator::PersonEstimator()
     }
 
     // Subscribe/advertise topics
-    person_belief_pub_ = nh_.advertise<sensor_msgs::PointCloud>("particle_cloud", 1);
+    person_belief_pub_ = nh_.advertise<sensor_msgs::PointCloud>("person_particle_cloud", 1);
     robot_pose_sub_ = nh_.subscribe("amcl_pose", 1, &PersonEstimator::robotPoseReceived, this);
     robot_cloud_sub_ = nh_.subscribe("particlecloud", 1, &PersonEstimator::robotCloudReceived, this);
     rfid_sub_ = nh_.subscribe("rfid", 1, &PersonEstimator::rfidReceived, this);

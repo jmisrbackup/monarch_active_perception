@@ -299,13 +299,13 @@ double PersonParticleFilter::entropyGMM()
 /** Initialize filter with a specific set of particles
   \param particle_set Particle set to initialize
   */
-void PersonParticleFilter::initFromParticles(sensor_msgs::PointCloud &particle_set)
+void PersonParticleFilter::initFromParticles(const sensor_msgs::PointCloud &particle_set)
 {
     int num_particles = particle_set.points.size();
 
     if(particles_.size() != num_particles)
     {
-        particles_.resize(num_particles);
+        particles_.resize(num_particles, 0);
     }
 
     // Look for the channel with weights
@@ -313,11 +313,17 @@ void PersonParticleFilter::initFromParticles(sensor_msgs::PointCloud &particle_s
     while(particle_set.channels[weights_channel].name.c_str() != "weights")
     {
         weights_channel++;
+        if(weights_channel >= particle_set.channels.size())
+        {
+            ROS_ERROR("PersonParticleFilter: Particle set must have a 'weights' channel");
+            return;
+        }
     }
 
     // Copy particles from particle set
     for(int i = 0; i < num_particles; i++)
     {
+        if(particles_[i] == 0) particles_[i] = new Particle();
         PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);
 
         part_ptr->pose_[0] = particle_set.points[i].x;
