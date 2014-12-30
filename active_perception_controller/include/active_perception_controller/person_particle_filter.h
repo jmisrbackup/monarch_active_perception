@@ -42,7 +42,7 @@ public:
     double entropyParticles();
     double entropyGMM();
 
-    void initFromParticles(sensor_msgs::PointCloud &particle_set);
+    void initFromParticles(const sensor_msgs::PointCloud &particle_set);
 
 protected:
     double sigma_pose_;                 ///< Starndard deviation for person movement
