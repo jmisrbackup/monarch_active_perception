@@ -249,18 +249,26 @@ double PersonParticleFilter::entropyParticles()
 
             /*
               entropy = log{ Sum_{s_i in S}( p(s_i(k-1)) * p(z(k))|s_i(k)) )} -
-              Sum{s_i in S}( log{ p(z(k))|s_i(k)) } * p(s_i(k)) )
+              Sum{s_i in S}( log{ p(z(k)|s_i(k)) } * p(s_i(k)) )
+
+              When p(s_i(k) | Z(k)) = 0 for all i, the entropy converges to 0
+              (see the original derivation and remember that lim_{x->0} x log(x) = 0)
               */
 
             for(int i = 0; i < particles_.size(); i++)
             {
                 obs_prob = rfid_model_->applySensorModel(*last_obs_, particles_[i]);
-                first_term += obs_prob*prev_weights_[i];
-
-                second_term += log(obs_prob)*particles_[i]->weight_;
+                if(obs_prob > 0)
+                {
+                    first_term += obs_prob*prev_weights_[i];
+                    second_term += log(obs_prob)*particles_[i]->weight_;
+                }
             }
 
-            entropy = log(first_term) - second_term;
+            if(first_term == 0)
+                entropy = 0;
+            else
+                entropy = log(first_term) - second_term;
         }
         else
             ROS_ERROR("Entropy cannot be computed without a sensor model");
@@ -310,7 +318,7 @@ void PersonParticleFilter::initFromParticles(const sensor_msgs::PointCloud &part
 
     // Look for the channel with weights
     int weights_channel = 0;
-    while(particle_set.channels[weights_channel].name.c_str() != "weights")
+    while(particle_set.channels[weights_channel].name != "weights")
     {
         weights_channel++;
         if(weights_channel >= particle_set.channels.size())

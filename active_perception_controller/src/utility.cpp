@@ -18,8 +18,6 @@ void Utility::setPersonParticles(const std::string& serialized_particles)
     }
     ros::serialization::IStream stream(buffer.get(), serial_size);
     ros::serialization::Serializer<sensor_msgs::PointCloud>::read(stream, person_particles_);
-    cout <<"read " << person_particles_.points.size() << " particles" << endl;
-
 }
 
 /**  This function computes the expected information gain for a future robot pose based on entropy gain.
@@ -36,6 +34,7 @@ double Utility::computeInfoGain(float px,
     geometry_msgs::PoseWithCovariance robot_pose;
     robot_pose.pose.position.x = px;
     robot_pose.pose.position.y = py;
+    robot_pose.pose.orientation.z = 1.0;
     // Init person_particle_filter with PointCloud = S
     int n_particles = person_particles_.points.size();
 
@@ -56,6 +55,7 @@ double Utility::computeInfoGain(float px,
     {
         Particle *part_ptr = particle_filter.getParticle(i);
         prob_det += part_ptr->weight_*sensor_model_->applySensorModel(rfid_obs, part_ptr);
+        //TODO: Somehow the part_ptr->weight sometimes comes as NAN.
     }
 
     prob_ndet = 1.0 - prob_det;
