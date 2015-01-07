@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-print "+ sys"
 import sys
 import os.path
 import time
@@ -8,24 +7,20 @@ import math
 import random
 import cPickle as pickle
 
-print "+ scipy"
 import numpy as np
 import scipy.linalg
 import scipy.signal
 
-print "+ dirs"
 import roslib
 SCOUT_NAVIGATION_DIR = roslib.packages.get_pkg_dir('scout_navigation')
 MAPS_DIR = roslib.packages.get_pkg_dir('maps')
 
-print "+ ros"
 import rospy
 import rosbag
 import tf
 from sensor_msgs.msg import *
 from geometry_msgs.msg import *
 
-print "+ planner"
 sys.path.append( SCOUT_NAVIGATION_DIR )
 import planner
 
@@ -37,6 +32,11 @@ DEFAULT_CLEARANCE = 0.5
 N_PARTICLES = 500
 FACTOR = 3
 
+# sensor model
+ANGLE_DELTA = 0.1 # 0.003 # hacked for Hokuyo (approx angle_increment/2)
+# observation model
+OCC_LOGPROB  =  5.0
+FREE_LOGPROB = -1.0
 
 
 
@@ -105,14 +105,6 @@ class PathParticleFilter:
         raise Exception, "Not yet implemented"
 
 class MapParticleModel:
-    # Gaussian FIR for occupied cells observation model
-    SIZE = 3
-    VARIANCE = 1.5**2
-    occkernel = np.exp( -np.arange(-SIZE,SIZE+1)**2 / (2*VARIANCE) )
-    # observation model
-    OCC_LOGPROB  =  5.0
-    FREE_LOGPROB = -1.0
-
     filters = None
     paths = cells = None
     
@@ -281,16 +273,71 @@ class MapParticleModel:
 
     def compute_importance(self, scan, pose):
         assert self.filters is not None, "no filters were generated yet"
+        ## prepare data
+        (position, quaternion) = pose
+        z = np.array(scan.ranges)
+        a = np.arange(scan.angle_min, scan.angle_min+scan.angle_increment*len(z), scan.angle_increment)
+        assert len(z)==len(a), "Range and angle arrays do not match"
+        # discard invalid ranges
+        valid = np.isfinite(z)
+        zv = z[valid]
+        valid[valid] = (zv>scan.range_min) & (zv<scan.range_max)
+        assert valid.any(), "No valid scan line found"
+        zi, ai = z[valid], a[valid]
+        # obtain laser pointcloud in device coordinates
+        xl = zi*np.cos(ai)
+        yl = zi*np.sin(ai)
+        # transform pointcloud according to tf
+        (xr, yr, zr) = position
+        T = tf.transformations.quaternion_matrix(quaternion)
+        R = T[0:3,0:3]
+        pl = np.vstack([xl, yl, np.zeros_like(zi)])
+        pb = np.dot(R, pl)
+        xi = pb[0,:] + xr
+        yi = pb[1,:] + yr
+        ti = np.arctan2(pb[1,:], pb[0,:])
+        # compute hit radius
+        ri = zi * math.sin(ANGLE_DELTA)
+        # compute bounding box
+        xmin = (xi-ri).min()
+        xmax = (xi+ri).max()
+        ymin = (yi-ri).min()
+        ymax = (yi+ri).max()
+        print "limits:", xmin, xmax, ymin, ymax
+        # gather particles
+        particles = np.vstack( [ np.hstack( [ pf.points,
+                                              i*np.ones(len(pf.points))[:,None],
+                                              np.arange(len(pf.points))[:,None] ] )
+                                 for (i,pf) in enumerate(self.filters) ] )
+        print "particles:", particles.shape
+        # select particles within bounding box
+        valid = reduce(np.logical_and, [ particles[:,0]>=xmin,
+                                         particles[:,0]<=xmax,
+                                         particles[:,1]>=ymin,
+                                         particles[:,1]<=ymax ] )
+        particles = particles[valid]
+        pj = particles[:,0]
+        qj = particles[:,1]
+        print "particles:", particles.shape
+        # select particles found occupied
+        occ_hits = ( (xi[:,None]-pj[None,:])**2 + (yi[:,None]-qj[None,:])**2 <= ri[:,None]**2 ).any(axis=1)
+        print "occ_hits:", occ_hits.shape, occ_hits.sum()
+        # select particles found free
+        bj  = np.arctan2(qj-yr, pj-xr)
+        dj2 = (pj-xr)**2 + (qj-yr)**2
+        free_hits = np.logical_and( np.abs(fix_angle(bj[None,:]-ti[:,None])) <= ANGLE_DELTA,
+                                    dj2[None,:] < zi[:,None]**2 ).any(axis=1)
+        print "free_hits:", free_hits.shape, free_hits.sum()
+        
+        # BUG: does not find as many free hits as expected even with large ANGLE_DELTA
 
+        plt.scatter([xr], [yr], c='k')
+        plt.scatter(xi, yi, c='r', marker='.', linewidth=0)
+        plt.scatter(pj, qj, c='b', marker='.', linewidth=0)
+        plt.scatter(pj[free_hits], qj[free_hits], c='g', marker='.', linewidth=0)
+        plt.show()
 
-
-
-
-        # TODO: re-write this
-
-
-
-
+        raise Exception
 
 
 
