@@ -67,5 +67,5 @@ double RfidSensorModel::applySensorModel(SensorData &obs_data, const Particle *p
         det_prob = 0.0;
     }
 
-    return 0.0;
+    return det_prob;
 }

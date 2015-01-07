@@ -63,7 +63,7 @@ class MotionPlanner():
                            if self._navmap.data[i] == 0]
         
         self._rrt_eta = rospy.get_param("rrt_eta", 1.0) # Notation from Karaman & Frazolli, 2011
-        self._rrt_lim = rospy.get_param("rrt_lim", 1000)
+        self._rrt_lim = rospy.get_param("rrt_lim", 100)
         
         self._planned = False # This is just for testing purposes. Delete me!
         mapdata = np.asarray(self._navmap.data, dtype=np.int8).reshape(height, width)
@@ -139,6 +139,7 @@ class MotionPlanner():
         #u = ap_utility.computeInfoGain(targets, self._robot_pose, 0)
         
         while len(V) < self._rrt_lim:
+            t2 = time.time()
             """
             Sampling new point
             """
@@ -191,6 +192,7 @@ class MotionPlanner():
                         else:
                             E[pnew_idx] = set([p_idx])              
                 nbrs.fit(V)
+            print 'iteration done. time: ', time.time()-t2
         print 'total time: ', time.time()-t1
         self.publish_rrt(V,E) 
 
