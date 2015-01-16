@@ -33,7 +33,7 @@ N_PARTICLES = 500
 FACTOR = 3
 
 # sensor model
-ANGLE_DELTA = 0.1 # 0.003 # hacked for Hokuyo (approx angle_increment/2)
+ANGLE_DELTA = 0.003 # hacked for Hokuyo (approx angle_increment/2)
 # observation model
 OCC_LOGPROB  =  5.0
 FREE_LOGPROB = -1.0
@@ -49,7 +49,7 @@ class PathParticleFilter:
     # random sample injection
     RANDOM_FRAC = 0 # 0.01
 
-    points = None  # [index,coordinate]
+    points = None  # [[x,y], ...]
     logprob = None  # [index]
     
     def __init__(self, path, factor):
@@ -73,9 +73,9 @@ class PathParticleFilter:
         self.logprob = np.zeros(total)
         #print "path: length=%s, took %s samples"%(n,total)
 
-    def apply_importance(self, func):
-        """func maps an array of [index,coordinate] points to importances of [index]"""
-        self.logprob += func(self.points)
+    def apply_importance(self, importance):
+        """importance is an array of log prob increments"""
+        self.logprob += importance
 
     def resample(self):
         # get normalized probabilities
@@ -166,111 +166,6 @@ class MapParticleModel:
         assert self.paths is not None, "no paths were generated"
         self.filters = [ PathParticleFilter(p, factor) for p in self.paths ]
 
-
-    # def find_swept_cells(self, scan, pose):
-    #     """scan is a ROS scan msg; pose is a (position, quaternion) tuple"""
-    #     s = self.pln.scale
-    #     #
-    #     (position, quaternion) = pose
-    #     z = np.array(scan.ranges)
-    #     a = np.arange(scan.angle_min, scan.angle_min+scan.angle_increment*len(z), scan.angle_increment)
-    #     assert len(z)==len(a), "Range and angle arrays do not match"
-    #     # discard invalid ranges
-    #     valid = np.isfinite(z)
-    #     zv = z[valid]
-    #     valid[valid] = (zv>scan.range_min) & (zv<scan.range_max)
-    #     assert valid.any(), "No valid scan line found"
-    #     z, a = z[valid], a[valid]
-    #     # obtain laser pointcloud in device coordinates
-    #     xl = z*np.cos(a)
-    #     yl = z*np.sin(a)
-    #     # transform pointcloud according to tf
-    #     T = tf.transformations.quaternion_matrix(quaternion)
-    #     R = T[0:3,0:3]
-    #     pl = np.vstack([xl, yl, np.zeros_like(z)])
-    #     pb = np.dot(R, pl)
-    #     xli = pb[0,:]
-    #     yli = pb[1,:]
-    #     a = np.arctan2(yli, xli)
-    #     #
-    #     # BROKEN CODE: (does not account for arbitrary LIDAR placements)
-    #     # z = np.array(scan.ranges)
-    #     # a = tr + np.arange(scan.angle_min, scan.angle_min+scan.angle_increment*len(z), scan.angle_increment)
-    #     # a = fix_angle(a)
-    #     # assert len(z)==len(a), "Range and angle arrays do not match"
-    #     # valid = np.isfinite(z)
-    #     # zv = z[valid]
-    #     # valid[valid] = (zv>scan.range_min) & (zv<scan.range_max)
-    #     # assert valid.any(), "No valid scan line found"
-    #     # z, a = z[valid], a[valid]
-    #     #
-    #     t1 = time.time()
-    #     # determine quadrants
-    #     q = 3*np.ones_like(a, dtype=int)
-    #     q[ (a>=-math.pi/4)   & (a<math.pi/4)   ] = 1
-    #     q[ (a>=math.pi/4)    & (a<3*math.pi/4) ] = 2
-    #     q[ (a>=-3*math.pi/4) & (a<-math.pi/4)  ] = 4
-    #     #print "q:", q
-    #     # determine sweep
-    #     kmax = int(math.ceil(max( np.abs(z*np.cos(a)/s).max(), np.abs(z*np.sin(a)/s).max() )))
-    #     k = np.arange(kmax+1)
-    #     #print "k:", k[0], "-", k[-1]
-    #     # sweep indices of hits
-    #     kh = np.empty_like(a, dtype=int)
-    #     kh[q==1] =  np.around(z[q==1]*np.cos(a[q==1])/s)
-    #     kh[q==2] =  np.around(z[q==2]*np.sin(a[q==2])/s)
-    #     kh[q==3] = -np.around(z[q==3]*np.cos(a[q==3])/s)
-    #     kh[q==4] = -np.around(z[q==4]*np.sin(a[q==4])/s)
-    #     #print "kh:", kh
-    #     # obtain [i,k] matrix where 0=unknown, 1=free, 2=hit
-    #     # where i is the angle index and k is the sweep index
-    #     m = np.zeros((len(a), len(k)), dtype=int)
-    #     m[ np.arange(len(k))[None,:] < kh[:,None] ] = 1
-    #     m[ xrange(len(a)), kh ] = 2
-    #     print "[sweeps: %f ms]"%(1000*(time.time()-t1))
-    #     #
-    #     t1 = time.time()
-    #     # determine index offsets of sweep
-    #     j = np.empty((len(a), len(k)), dtype=int)
-    #     i = np.empty((len(a), len(k)), dtype=int)
-    #     # Q I
-    #     j[q==1,:] = k[None,:]
-    #     i[q==1,:] = -np.around(np.tan(a[q==1,None])*k[None,:])
-    #     # Q II
-    #     j[q==2,:] = np.around((1/np.tan(a[q==2,None]))*k[None,:])
-    #     i[q==2,:] = -k[None,:]
-    #     # Q III
-    #     j[q==3,:] = -k[None,:]
-    #     i[q==3,:] =  np.around(np.tan(a[q==3,None])*k[None,:])
-    #     # Q IV
-    #     j[q==4,:] = -np.around((1/np.tan(a[q==4,None]))*k[None,:])
-    #     i[q==4,:] =  k[None,:]
-    #     print "[sweep in index coords: %f ms]"%(1000*(time.time()-t1))
-    #     # determine swept map indices found free
-    #     t1 = time.time()
-    #     (ir, jr) = self.pln.p2i((position[0], position[1]))
-    #     imfree = ir + i[m==1]
-    #     jmfree = jr + j[m==1]
-    #     imocc  = ir + i[m==2]
-    #     jmocc  = jr + j[m==2]
-    #     # check map limits
-    #     valid = (imfree>=0) & (imfree<self.pln.H) & (jmfree>=0) & (jmfree<self.pln.W)
-    #     imfree = imfree[valid]
-    #     jmfree = jmfree[valid]
-    #     valid = (imocc>=0) & (imocc<self.pln.H) & (jmocc>=0) & (jmocc<self.pln.W)
-    #     imocc = imocc[valid]
-    #     jmocc = jmocc[valid]
-    #     # # prune repeated cells -- TODO: rethink this method; doesn't seem to work at all
-    #     # matches = np.logical_and(imfree[1:]==imfree[:-1],
-    #     #                          jmfree[1:]==jmfree[:-1])
-    #     # unique = np.ones_like(jmfree, dtype=bool)
-    #     # unique[:-1] = np.logical_not(matches)
-    #     # print "prunning repeated free cells:", len(imfree),
-    #     # imfree = imfree[unique]
-    #     # jmfree = jmfree[unique]
-    #     # print "->", len(imfree)
-    #     return (imfree, jmfree, imocc, jmocc)
-
     def compute_importance(self, scan, pose):
         assert self.filters is not None, "no filters were generated yet"
         ## prepare data
@@ -287,6 +182,7 @@ class MapParticleModel:
         # obtain laser pointcloud in device coordinates
         xl = zi*np.cos(ai)
         yl = zi*np.sin(ai)
+        print "laser points:", len(xl), "=", len(yl)
         # transform pointcloud according to tf
         (xr, yr, zr) = position
         T = tf.transformations.quaternion_matrix(quaternion)
@@ -304,117 +200,74 @@ class MapParticleModel:
         ymin = (yi-ri).min()
         ymax = (yi+ri).max()
         print "limits:", xmin, xmax, ymin, ymax
-        # gather particles
+        # gather particles -- array of [x, y, filter_index, point_index]
         particles = np.vstack( [ np.hstack( [ pf.points,
                                               i*np.ones(len(pf.points))[:,None],
                                               np.arange(len(pf.points))[:,None] ] )
                                  for (i,pf) in enumerate(self.filters) ] )
-        print "particles:", particles.shape
+        print "all particles:", particles.shape
         # select particles within bounding box
-        valid = reduce(np.logical_and, [ particles[:,0]>=xmin,
-                                         particles[:,0]<=xmax,
-                                         particles[:,1]>=ymin,
-                                         particles[:,1]<=ymax ] )
-        particles = particles[valid]
-        pj = particles[:,0]
-        qj = particles[:,1]
-        print "particles:", particles.shape
+        within = reduce(np.logical_and, [ particles[:,0]>=xmin,
+                                          particles[:,0]<=xmax,
+                                          particles[:,1]>=ymin,
+                                          particles[:,1]<=ymax ] )
+        particles_within = particles[within]
+        pj = particles_within[:,0]
+        qj = particles_within[:,1]
+        print "particles in bbox:", particles_within.shape
         # select particles found occupied
-        occ_hits = ( (xi[:,None]-pj[None,:])**2 + (yi[:,None]-qj[None,:])**2 <= ri[:,None]**2 ).any(axis=1)
+        occ_hits = ( (xi[:,None]-pj[None,:])**2 + (yi[:,None]-qj[None,:])**2 <= ri[:,None]**2 ).any(axis=0)
         print "occ_hits:", occ_hits.shape, occ_hits.sum()
         # select particles found free
         bj  = np.arctan2(qj-yr, pj-xr)
         dj2 = (pj-xr)**2 + (qj-yr)**2
         free_hits = np.logical_and( np.abs(fix_angle(bj[None,:]-ti[:,None])) <= ANGLE_DELTA,
-                                    dj2[None,:] < zi[:,None]**2 ).any(axis=1)
+                                    dj2[None,:] < zi[:,None]**2 ).any(axis=0)
         print "free_hits:", free_hits.shape, free_hits.sum()
-        
-        # BUG: does not find as many free hits as expected even with large ANGLE_DELTA
-
-        plt.scatter([xr], [yr], c='k')
-        plt.scatter(xi, yi, c='r', marker='.', linewidth=0)
-        plt.scatter(pj, qj, c='b', marker='.', linewidth=0)
-        plt.scatter(pj[free_hits], qj[free_hits], c='g', marker='.', linewidth=0)
-        plt.show()
-
-        raise Exception
-
-
-
-
-
-
-
-        # determine swept cells
-        (imfree, jmfree, imocc, jmocc) = self.find_swept_cells(scan, pose)
-        # bounding box of swept cells
-        imin = min(imfree.min(), imocc.min())
-        imax = max(imfree.max(), imocc.max())
-        jmin = min(jmfree.min(), jmocc.min())
-        jmax = max(jmfree.max(), jmocc.max())
-        ww  = jmax - jmin + 1
-        wh  = imax - imin + 1
-        # win is a map window containing the log prob of occupancy for each cell
-        win = np.zeros((wh, ww))
-
-        # place dirac functions on occupied cells
-        win[ imocc-imin, jmocc-jmin ] = self.OCC_LOGPROB
-        # convolve with a separable FIR kernel
-        win = scipy.signal.sepfir2d(win, self.occkernel, self.occkernel)
-        # reduce log prob of free cells
-        win[imfree-imin, jmfree-jmin] += self.FREE_LOGPROB
-
-        # hacking I
-        # win[ imocc-imin, jmocc-jmin ] = +1
-
-        # hacking II
-        # kernel = np.array([[0.5, 1.0, 0.5],
-        #                    [1.0, 1.0, 1.0],
-        #                    [0.5, 1.0, 0.5]])
-        # for i in xrange(3):
-        #     for j in xrange(3):
-        #         u = imocc-imin -1+i
-        #         v = jmocc-jmin -1+j
-        #         valid = (u>=0) & (u<wh) & (v>=0) & (v<ww)
-        #         win[ u[valid], v[valid] ] = kernel[i,j]
-
-        # determine log prob increments for swept cells
-        def importance(points):
-            """assume points in [index,coordinate]"""
-            n  = len(points)
-            ii = points[:,0] - imin
-            jj = points[:,1] - jmin
-            valid = (ii>=0) & (ii<wh) & (jj>=0) & (jj<ww)
-            logprob = np.zeros(n)
-            logprob[valid] = win[ ii[valid], jj[valid] ]
-            return logprob
-
-        # OLD CODE
-        # # winfree and winocc are map windows containing swept cells
-        # winfree = np.zeros((wh, ww), dtype=bool)
-        # winfree[imfree-imin, jmfree-jmin] = True  # NOTE: did s/jmax/jmin/g here
-        # winocc = np.zeros((wh, ww), dtype=bool)
-        # winocc[imocc-imin, jmocc-jmin] = True
-        # # determine log prob increments for swept cells
-        # def importance(points):
-        #     """assume points in [index,coordinate]"""
-        #     n  = len(points)
-        #     ii = points[:,0] - imin
-        #     jj = points[:,1] - jmin
-        #     valid = (ii>=0) & (ii<wh) & (jj>=0) & (jj<ww)
-        #     free = np.zeros(n, dtype=bool)
-        #     free[valid] = winfree[ ii[valid], jj[valid] ]
-        #     occ = np.zeros(n, dtype=bool)
-        #     occ[valid] = winocc[ ii[valid], jj[valid] ]
-        #     # HACK: hardcoded log prob increments
-        #     res = np.zeros(n)
-        #     res[free] = -1
-        #     res[occ]  = +1
-        #     #print "importance: %s hits in %s points"%(hits.sum(),n)
-        #     return res
-
-        for p in self.filters:
-            p.apply_importance(importance)
+        # -- visual debug zone --
+        if False:
+            for i in xrange(len(xi)):
+                coords = np.array([[xr, yr],
+                                   [xr + zi[i]*math.cos(ti[i]-ANGLE_DELTA), 
+                                    yr + zi[i]*math.sin(ti[i]-ANGLE_DELTA)],
+                                   [xr + zi[i]*math.cos(ti[i]+ANGLE_DELTA), 
+                                    yr + zi[i]*math.sin(ti[i]+ANGLE_DELTA)]])
+                p = plt.Polygon(coords, color='g', lw=0)
+                plt.gca().add_artist(p)
+                c = plt.Circle((xi[i],yi[i]), ri[i], color='r', lw=0)
+                plt.gca().add_artist(c)
+        if False:
+            for j in xrange(len(pj)):
+                l = plt.Line2D([xr, xr+math.sqrt(dj2[j])*math.cos(bj[j])],
+                               [yr, yr+math.sqrt(dj2[j])*math.sin(bj[j])])
+                plt.gca().add_artist(l)
+        if False:
+            plt.scatter([xr], [yr], c='k')
+            plt.scatter(xi, yi, c='m', marker='.', linewidth=0)
+            colors = np.empty_like(free_hits, dtype=str)
+            colors[:] = 'b'
+            colors[free_hits] = 'g'
+            colors[occ_hits]  = 'r'
+            plt.scatter(pj, qj, c=colors, marker='.', linewidth=0)
+            plt.show()
+        # -- // --
+        # part of particles_within table which fall within free and occupied zones
+        parts_free = particles_within[free_hits]
+        parts_occ  = particles_within[occ_hits]
+        for (k,pf) in enumerate(self.filters):
+            importance = np.zeros(len(pf.points))
+            if len(parts_free)>0:
+                # update particles in free zone
+                free_mask = (parts_free[:,2] == k)
+                free_idx  = parts_free[free_mask,3].astype(int)
+                importance[free_idx] = FREE_LOGPROB
+            if len(parts_occ)>0:
+                # update particles in occupied zone
+                occ_mask = (parts_occ[:,2] == k)
+                occ_idx  = parts_occ[occ_mask,3].astype(int)
+                importance[occ_idx] = OCC_LOGPROB
+            print k, importance
+            pf.apply_importance(importance)
         
     def resample(self):
         assert self.filters is not None, "no filters were generated yet"
@@ -492,6 +345,9 @@ def test4(state="path_filters.state", scan="scan.state"):
         pose = data['pose']
     # 4. compute importance
     mpm.compute_importance(scan, pose)
+
+    # ESTOU AQUI
+
     #
     plt.subplot(131)
     img = np.zeros(mpm.pln.occgrid.shape)
