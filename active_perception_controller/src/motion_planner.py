@@ -42,10 +42,16 @@ class MotionPlanner():
 
         self._robot_pose = PoseWithCovariance()
         
-        self._test_pub = rospy.Publisher("rrt",
+        self._rrt_pub = rospy.Publisher("rrt",
                                          Path,
                                          queue_size=1,
                                          latch = True)
+
+        self._path_pub = rospy.Publisher("best_path",
+                                         Path,
+                                         queue_size=1,
+                                         latch = True)
+
         
         getmap = rospy.ServiceProxy('static_map', GetMap)
         
@@ -141,9 +147,7 @@ class MotionPlanner():
         nbrs.fit(V)
         cmin = 0
         t1 = time.time()
-        
-        #u = ap_utility.computeInfoGain(targets, self._robot_pose, 0)
-        
+                
         while len(V) < self._rrt_lim:
             t2 = time.time()
             """
@@ -172,7 +176,7 @@ class MotionPlanner():
                 w_post = ap_utility.VectorOfDoubles()
                 w.extend(W[pnearest_idx])
                 i = self.utility_function.computeInfoGain(pnew[0], pnew[1], w, w_post)
-                cmin = C[pnearest_idx] + np.linalg.norm(pnearest-pnew)
+                cmin = i # C[pnearest_idx] + np.linalg.norm(pnearest-pnew)
                 for p_idx in Pnear_idx:
                     c = C[p_idx] + np.linalg.norm(V[p_idx]-pnew)
                     if (self.segment_safe(V[p_idx],pnew) is True and 
@@ -204,11 +208,10 @@ class MotionPlanner():
                             E[pnew_idx] = set([p_idx])              
                 nbrs.fit(V)
             print 'iteration done. time: ', time.time()-t2
-            print '|V|: ', len(V)
-            print 'I:', I
-            print 'max I: ', 
+            print 'min entropy:', np.min(I)
         print 'total time: ', time.time()-t1
         self.publish_rrt(V,E) 
+        self.publish_best_path(parents, V, C)
 
     def publish_rrt(self, V,E):
         pt = Path()
@@ -222,7 +225,27 @@ class MotionPlanner():
             pose.pose.position.x = p[0]
             pose.pose.position.y = p[1]
             pt.poses.append(pose)
-        self._test_pub.publish(pt)
+        self._rrt_pub.publish(pt)
+        
+    def publish_best_path(self, parents, V, C):
+        pt = Path()
+        pt.header.frame_id = '/map'
+        m = np.argmin(C)
+        at_root = False
+        
+        while not at_root:
+            pose = PoseStamped()
+            pose.header.frame_id = '/map'
+            p = V[m]
+            pose.pose.position.x = p[0]
+            pose.pose.position.y = p[1]
+            pt.poses.append(pose)
+            if m == 0:
+                at_root = True
+            else:
+                m = parents[m]
+            
+        self._path_pub.publish(pt)
         
     def gen_path(self, ix, p_ix, V, E, path, vis ):
         path.append(V[ix])
