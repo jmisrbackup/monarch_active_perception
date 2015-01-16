@@ -9,15 +9,48 @@ sensor_model_(new RfidSensorModel(prob_image_path, resolution))
 
 void Utility::setPersonParticles(const std::string& serialized_particles)
 {
+    sensor_msgs::PointCloud pc;
     /*This is taken from the ROS python_bindings_tutorial*/
     size_t serial_size = serialized_particles.size();
     boost::shared_array<uint8_t> buffer(new uint8_t[serial_size]);
     for (size_t i = 0; i < serial_size; ++i)
     {
-      buffer[i] = serialized_particles[i];
+        buffer[i] = serialized_particles[i];
     }
     ros::serialization::IStream stream(buffer.get(), serial_size);
-    ros::serialization::Serializer<sensor_msgs::PointCloud>::read(stream, person_particles_);
+    ros::serialization::Serializer<sensor_msgs::PointCloud>::read(stream, pc);
+
+    size_t num_particles = pc.points.size();
+
+    if(person_particles_.size() != num_particles)
+    {
+        person_particles_.resize(num_particles, 0);
+    }
+
+    // Look for the channel with weights
+    int weights_channel = 0;
+    while(pc.channels[weights_channel].name != "weights")
+    {
+        weights_channel++;
+        if(weights_channel >= pc.channels.size())
+        {
+            ROS_ERROR("PersonParticleFilter: Particle set must have a 'weights' channel");
+            return;
+        }
+    }
+
+    // Copy particles from particle set
+    for(int i = 0; i < num_particles; i++)
+    {
+        if(person_particles_[i] != 0)
+            free(person_particles_[i]);
+
+        person_particles_[i] = (Particle*) (new PersonParticle());
+        PersonParticle * part_ptr = (PersonParticle *)(person_particles_[i]);
+        part_ptr->pose_[0] = pc.points[i].x;
+        part_ptr->pose_[1] = pc.points[i].y;
+        part_ptr->weight_ = pc.channels[weights_channel].values[i];
+    }
 }
 
 /**  This function computes the expected information gain for a future robot pose based on entropy gain.
@@ -29,33 +62,32 @@ void Utility::setPersonParticles(const std::string& serialized_particles)
   \return entropy_gain Expected entropy gain
 */
 double Utility::computeInfoGain(float px,
-                                float py)
+                                float py,
+                                vector<double>& prev_weights,
+                                vector<double>& updated_weights)
 {
     geometry_msgs::PoseWithCovariance robot_pose;
     robot_pose.pose.position.x = px;
     robot_pose.pose.position.y = py;
-    robot_pose.pose.orientation.z = 1.0;
-    // Init person_particle_filter with PointCloud = S
-    int n_particles = person_particles_.points.size();
-
-    PersonParticleFilter particle_filter(n_particles);
-    particle_filter.initFromParticles(person_particles_);
-    particle_filter.setSensorModel(sensor_model_.get());
-
-    /* p(z=yes) = Sum_{s_i in S}(p(s_i)*p(z=yes|s_i))
-       p(z=no) = 1 - p(z=yes)
-    */
+    robot_pose.pose.orientation.z = 1.0; //TODO: Orientation is still a problem.
+    prev_weights.resize(person_particles_.size(),0);
+    updated_weights.resize(person_particles_.size(),0);
+    vector<double> det_weights(person_particles_.size(),0);
+    vector<double> ndet_weights(person_particles_.size(),0);
 
     double prob_det = 0.0, prob_ndet;
     RfidSensorData rfid_obs;
     rfid_obs.rfid_ = true;
     rfid_obs.pose_ = robot_pose;
 
-    for(int i = 0; i < n_particles; i++)
+    /* p(z=yes) = Sum_{s_i in S}(p(s_i)*p(z=yes|s_i))
+       p(z=no) = 1 - p(z=yes)
+    */
+
+    for(int i = 0; i < person_particles_.size(); i++)
     {
-        Particle *part_ptr = particle_filter.getParticle(i);
-        prob_det += part_ptr->weight_*sensor_model_->applySensorModel(rfid_obs, part_ptr);
-        //TODO: Somehow the part_ptr->weight sometimes comes as NAN.
+        Particle *part_ptr = person_particles_[i];
+        prob_det += prev_weights[i]*sensor_model_->applySensorModel(rfid_obs, part_ptr);
     }
 
     prob_ndet = 1.0 - prob_det;
@@ -64,19 +96,40 @@ double Utility::computeInfoGain(float px,
        Compute entropy S' = H'(z=yes)
     */
     double entropy_det, entropy_ndet;
-    particle_filter.update(rfid_obs);
-    entropy_det = particle_filter.entropyParticles();
 
+    PersonParticleFilter::update(*(sensor_model_.get()),
+                                 person_particles_,
+                                 rfid_obs,
+                                 prev_weights,
+                                 det_weights);
+
+    entropy_det = PersonParticleFilter::entropyParticles(*(sensor_model_.get()),
+                                                         person_particles_,
+                                                         rfid_obs,
+                                                         prev_weights,
+                                                         det_weights);
     /* Update S with z = no -> S'
        Compute entropy S' = H'(z=no)
     */
-    particle_filter.initFromParticles(person_particles_);
     rfid_obs.rfid_ = false;
-    particle_filter.update(rfid_obs);
-    entropy_ndet = particle_filter.entropyParticles();
+
+    PersonParticleFilter::update(*(sensor_model_.get()),
+                                 person_particles_,
+                                 rfid_obs,
+                                 prev_weights,
+                                 ndet_weights);
+
+    entropy_ndet = PersonParticleFilter::entropyParticles(*(sensor_model_.get()),
+                                                          person_particles_,
+                                                          rfid_obs,
+                                                          prev_weights,
+                                                          ndet_weights);
 
     /* Expected_H' = H'(z=yes)*p(z=yes) + H'(z=no)*p(z=no) */
+    ROS_INFO_STREAM("pdet: " << prob_det << " entropy det " << entropy_det << " prob_ndet: " << prob_ndet << " entropy ndet " << entropy_ndet);
+
+    for(size_t i = 0; i < updated_weights.size(); i++)
+        updated_weights[i] = prob_det*det_weights[i] + prob_ndet*ndet_weights[i];
 
     return entropy_det*prob_det + entropy_ndet*prob_ndet;
 }
-

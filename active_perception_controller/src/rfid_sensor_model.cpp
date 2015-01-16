@@ -42,7 +42,7 @@ double RfidSensorModel::applySensorModel(SensorData &obs_data, const Particle *p
 
     Transform robot_tf;
     Vector3 rob_translation(tfScalar(rfid_data->pose_.pose.position.x),tfScalar(rfid_data->pose_.pose.position.y),tfScalar(rfid_data->pose_.pose.position.z));
-    Vector3 global_position(particle_data->pose_[0],particle_data->pose_[0],0.0);
+    Vector3 global_position(particle_data->pose_[0],particle_data->pose_[1],0.0);
 
     Quaternion rob_rotation;
     quaternionMsgToTF(rfid_data->pose_.pose.orientation, rob_rotation);
@@ -67,5 +67,8 @@ double RfidSensorModel::applySensorModel(SensorData &obs_data, const Particle *p
         det_prob = 0.0;
     }
 
-    return det_prob;
+    if(rfid_data->rfid_ == true)
+        return det_prob; //TODO: should be P(true positive)*det_prob + P(false positive)
+    else
+        return 1-det_prob; //TODO: should be P(true negative)*(1-det_prob) + P(false negative)
 }

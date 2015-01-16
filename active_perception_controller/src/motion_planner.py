@@ -39,6 +39,7 @@ class MotionPlanner():
                                                       PointCloud,
                                                       self.target_particle_cloud_cb,
                                                       queue_size=1)
+
         self._robot_pose = PoseWithCovariance()
         
         self._test_pub = rospy.Publisher("rrt",
@@ -73,6 +74,7 @@ class MotionPlanner():
         pkgpath = roslib.packages.get_pkg_dir('active_perception_controller')
         self.utility_function = ap_utility.Utility(str(pkgpath) + "/config/sensormodel.png",
                                                    0.1034)
+        self.current_weights = []
         self._lock.release()
         
     def robot_pose_cb(self, msg):
@@ -83,6 +85,8 @@ class MotionPlanner():
         buf = StringIO()
         msg.serialize(buf)
         self.utility_function.setPersonParticles(buf.getvalue())
+        channel = [c for c in msg.channels if c.name == 'weights']
+        self.current_weights = channel[0].values
         
         self.plan()
         self._lock.release()
@@ -130,7 +134,9 @@ class MotionPlanner():
         V = [probot]
         E = {}
         parents = {}
+        W = [self.current_weights]
         C = [0.0]
+        I = [0.0]
         nbrs = NearestNeighbors(n_neighbors=1)
         nbrs.fit(V)
         cmin = 0
@@ -162,7 +168,10 @@ class MotionPlanner():
                 Pnear_idx = nbrs.radius_neighbors(pnew, r, return_distance = False)
                 Pnear_idx = Pnear_idx[0]
                 pmin_idx = pnearest_idx
-                i = self.utility_function.computeInfoGain(pnew[0], pnew[1])
+                w = ap_utility.VectorOfDoubles()
+                w_post = ap_utility.VectorOfDoubles()
+                w.extend(W[pnearest_idx])
+                i = self.utility_function.computeInfoGain(pnew[0], pnew[1], w, w_post)
                 cmin = C[pnearest_idx] + np.linalg.norm(pnearest-pnew)
                 for p_idx in Pnear_idx:
                     c = C[p_idx] + np.linalg.norm(V[p_idx]-pnew)
@@ -178,6 +187,8 @@ class MotionPlanner():
                 pnew_idx = len(V)
                 V.append(pnew)
                 C.append(cmin)
+                W.append(w_post)
+                I.append(i)
                 parents[pnew_idx] = pmin_idx
                 """
                 Re-wire the tree
@@ -193,6 +204,9 @@ class MotionPlanner():
                             E[pnew_idx] = set([p_idx])              
                 nbrs.fit(V)
             print 'iteration done. time: ', time.time()-t2
+            print '|V|: ', len(V)
+            print 'I:', I
+            print 'max I: ', 
         print 'total time: ', time.time()-t1
         self.publish_rrt(V,E) 
 
