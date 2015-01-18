@@ -51,6 +51,7 @@ public:
                                    const vector<double>& prev_weights,
                                    const vector<double>& current_weights);
     double entropyGMM();
+    static double entropyGMM(const vector<double>& current_weights, double sigma_pose);
 
     void initFromParticles(const sensor_msgs::PointCloud &particle_set);
 

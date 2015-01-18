@@ -1,12 +1,24 @@
 #include <active_perception_controller/utility.h>
 #include <active_perception_controller/person_particle_filter.h>
+#include <tf/transform_datatypes.h>
 #include <ros/serialization.h>
 
+/**
+ * \brief Constructor
+ * \param prob_image_path Image with sensor model
+ * \param resolution Image resolution for sensor model
+ * \param sigma_pose Standard deviation for person movement
+ */
 Utility::Utility(std::string prob_image_path,
-                 float resolution) :
+                 float resolution, double sigma_pose) :
 sensor_model_(new RfidSensorModel(prob_image_path, resolution))
-{}
+{
+    sigma_pose_ = sigma_pose;
+}
 
+/** \brief Setting values for the particles
+ * \param serialized_particles New particles serialized
+ */
 void Utility::setPersonParticles(const std::string& serialized_particles)
 {
     sensor_msgs::PointCloud pc;
@@ -56,20 +68,23 @@ void Utility::setPersonParticles(const std::string& serialized_particles)
 /**  This function computes the expected information gain for a future robot pose based on entropy gain.
     Given the current belief over the person position, it is computed the entropy gain
     by moving the robot to a future pose and taking a measurement there.
-  \param person_particles Current belief over the person position
-  \param robot_pose Future robot pose to evaluate
-  \param sensor_model Sensor model to update belief
+  \param px Future robot pose to evaluate
+  \param py Future robot pose to evaluate
+  \param yaw Future robot yaw to evaluate
+  \param prev_weights Particle weights for current position
+  \param updated_weights Particle weights after updating in future position. Expected values are computed
   \return entropy_gain Expected entropy gain
 */
 double Utility::computeInfoGain(float px,
                                 float py,
+                                float yaw,
                                 vector<double>& prev_weights,
                                 vector<double>& updated_weights)
 {
     geometry_msgs::PoseWithCovariance robot_pose;
     robot_pose.pose.position.x = px;
     robot_pose.pose.position.y = py;
-    robot_pose.pose.orientation.z = 1.0; //TODO: Orientation is still a problem.
+    robot_pose.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(0.0, 0.0, yaw);
     prev_weights.resize(person_particles_.size(),0);
     updated_weights.resize(person_particles_.size(),0);
     vector<double> det_weights(person_particles_.size(),0);
@@ -108,6 +123,11 @@ double Utility::computeInfoGain(float px,
                                                          rfid_obs,
                                                          prev_weights,
                                                          det_weights);
+
+    // Alternative method
+    // entropy_det = PersonParticleFilter::entropyGMM(det_weights, sigma_pose_);
+
+
     /* Update S with z = no -> S'
        Compute entropy S' = H'(z=no)
     */
@@ -124,6 +144,10 @@ double Utility::computeInfoGain(float px,
                                                           rfid_obs,
                                                           prev_weights,
                                                           ndet_weights);
+
+    // Alternative method
+    // entropy_ndet = PersonParticleFilter::entropyGMM(ndet_weights, sigma_pose_);
+
 
     /* Expected_H' = H'(z=yes)*p(z=yes) + H'(z=no)*p(z=no) */
     ROS_INFO_STREAM("pdet: " << prob_det << " entropy det " << entropy_det << " prob_ndet: " << prob_ndet << " entropy ndet " << entropy_ndet);

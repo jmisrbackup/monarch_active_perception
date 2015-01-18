@@ -16,17 +16,18 @@ public:
     Utility(){};
 
     Utility(std::string prob_image_path,
-            float resolution);
+            float resolution, double sigma_pose);
 
     void setPersonParticles(const std::string& serialized_particles);
     double computeInfoGain(float px,
                            float py,
+                           float yaw,
                            std::vector<double>& prev_weights,
                            std::vector<double>& updated_weights);
 private:
     std::vector<Particle*> person_particles_;
     boost::shared_ptr<RfidSensorModel> sensor_model_;
-    double last_entropy_;
+    double sigma_pose_;
 };
 
 using namespace boost::python;
@@ -34,7 +35,7 @@ using namespace boost::python;
 BOOST_PYTHON_MODULE(ap_utility)
 {
     class_<Utility>("Utility")
-        .def(init<std::string, float>())
+        .def(init<std::string, float, double>())
         .def("setPersonParticles", &Utility::setPersonParticles)
         .def("computeInfoGain", &Utility::computeInfoGain);
 

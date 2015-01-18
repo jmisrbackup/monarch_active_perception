@@ -71,6 +71,7 @@ class MotionPlanner():
         
         self._rrt_eta = rospy.get_param("rrt_eta", 1.0) # Notation from Karaman & Frazolli, 2011
         self._rrt_lim = rospy.get_param("rrt_lim", 100)
+	sigma_person = rospy.get_param("sigma_person", 0.05)
         
         self._planned = False # This is just for testing purposes. Delete me!
         mapdata = np.asarray(self._navmap.data, dtype=np.int8).reshape(height, width)
@@ -79,7 +80,7 @@ class MotionPlanner():
         
         pkgpath = roslib.packages.get_pkg_dir('active_perception_controller')
         self.utility_function = ap_utility.Utility(str(pkgpath) + "/config/sensormodel.png",
-                                                   0.1034)
+                                                   0.1034, sigma_person)
         self.current_weights = []
         self._lock.release()
         
@@ -175,7 +176,10 @@ class MotionPlanner():
                 w = ap_utility.VectorOfDoubles()
                 w_post = ap_utility.VectorOfDoubles()
                 w.extend(W[pnearest_idx])
-                i = self.utility_function.computeInfoGain(pnew[0], pnew[1], w, w_post)
+
+                i = self.utility_function.computeInfoGain(pnew[0], pnew[1], 0.0, w, w_post)
+		# TODO Pose yaw is always evaluated in 0.0. Sensor model assumed isotropic
+
                 cmin = i # C[pnearest_idx] + np.linalg.norm(pnearest-pnew)
                 for p_idx in Pnear_idx:
                     c = C[p_idx] + np.linalg.norm(V[p_idx]-pnew)
