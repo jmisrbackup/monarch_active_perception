@@ -117,7 +117,8 @@ double Utility::computeInfoGain(float px,
                                  person_particles_,
                                  rfid_obs,
                                  prev_weights,
-                                 ndet_weights);
+                                 updated_weights);
+    //                             ndet_weights);
 
     entropy_ndet = PersonParticleFilter::entropyParticles(*(sensor_model_.get()),
                                                           person_particles_,
@@ -128,8 +129,8 @@ double Utility::computeInfoGain(float px,
     /* Expected_H' = H'(z=yes)*p(z=yes) + H'(z=no)*p(z=no) */
     ROS_INFO_STREAM("pdet: " << prob_det << " entropy det " << entropy_det << " prob_ndet: " << prob_ndet << " entropy ndet " << entropy_ndet);
 
-    for(size_t i = 0; i < updated_weights.size(); i++)
-        updated_weights[i] = prob_det*det_weights[i] + prob_ndet*ndet_weights[i];
-
+//    for(size_t i = 0; i < updated_weights.size(); i++)
+//        updated_weights[i] = prob_det*det_weights[i] + prob_ndet*ndet_weights[i];
+        //updated_weights[i] = prob_det*det_weights[i] + prob_ndet*ndet_weights[i];
     return entropy_det*prob_det + entropy_ndet*prob_ndet;
 }

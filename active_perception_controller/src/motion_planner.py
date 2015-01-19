@@ -13,7 +13,7 @@ import pdb
 import rospy
 import roslib
 from rospy.numpy_msg import numpy_msg
-from sensor_msgs.msg._PointCloud import PointCloud
+from sensor_msgs.msg import PointCloud, ChannelFloat32
 from sklearn.neighbors import NearestNeighbors
 
 import time
@@ -51,6 +51,11 @@ class MotionPlanner():
                                          Path,
                                          queue_size=1,
                                          latch = True)
+        
+        self._entropy_pub = rospy.Publisher("entropy_points",
+                                         PointCloud,
+                                         queue_size=1,
+                                         latch = True)
 
         
         getmap = rospy.ServiceProxy('static_map', GetMap)
@@ -71,6 +76,8 @@ class MotionPlanner():
         
         self._rrt_eta = rospy.get_param("rrt_eta", 1.0) # Notation from Karaman & Frazolli, 2011
         self._rrt_lim = rospy.get_param("rrt_lim", 100)
+        robot_radius = rospy.get_param("robot_radius", 0.35)
+        self._robot_radius_px = robot_radius / self._navmap.info.resolution
         
         self._planned = False # This is just for testing purposes. Delete me!
         mapdata = np.asarray(self._navmap.data, dtype=np.int8).reshape(height, width)
@@ -210,8 +217,10 @@ class MotionPlanner():
             print 'iteration done. time: ', time.time()-t2
             print 'min entropy:', np.min(I)
         print 'total time: ', time.time()-t1
+        print 'I', I
         self.publish_rrt(V,E) 
         self.publish_best_path(parents, V, C)
+        self.publish_entropy_info(V, I)
 
     def publish_rrt(self, V,E):
         pt = Path()
@@ -246,6 +255,20 @@ class MotionPlanner():
                 m = parents[m]
             
         self._path_pub.publish(pt)
+
+    def publish_entropy_info(self, V, I):
+        pc = PointCloud()
+        ch = ChannelFloat32()
+        ch.name = 'weights'
+        ch.values = I
+        for v in V:
+            g = Point32()
+            g.x = v[0]
+            g.y = v[1]
+            pc.points.append(g)
+        pc.channels.append(ch)
+        pc.header.frame_id = "/map"
+        self._entropy_pub.publish(pc)
         
     def gen_path(self, ix, p_ix, V, E, path, vis ):
         path.append(V[ix])
@@ -283,6 +306,9 @@ class MotionPlanner():
         return v1
     
     def distance_transform_search(self, org_idx, dst_idx):
+        if self._distmap[dst_idx[1],dst_idx[0]] < self._robot_radius_px:
+            return False
+        
         alpha = atan2(dst_idx[1]-org_idx[1],
                       dst_idx[0]-org_idx[0])
         ca = cos(alpha)
@@ -291,7 +317,7 @@ class MotionPlanner():
         while not np.all(ridx == dst_idx):
             dist = self._distmap[int(ridx[1]),
                                  int(ridx[0])]
-            if dist == 0:
+            if dist < self._robot_radius_px:
                 return False
             elif np.linalg.norm(ridx - dst_idx) < dist:
                 return True
