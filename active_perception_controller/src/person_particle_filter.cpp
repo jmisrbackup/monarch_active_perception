@@ -157,16 +157,26 @@ void PersonParticleFilter::update(SensorData &obs_data)
             // Save previous information
             prev_weights_[i] = particles_[i]->weight_;
 
-            particles_[i]->weight_ = rfid_model_->applySensorModel(obs_data, particles_[i]);
+            particles_[i]->weight_ = particles_[i]->weight_ * rfid_model_->applySensorModel(obs_data, particles_[i]);
             total_weight += particles_[i]->weight_;
         }
 
-        // Normalize weights
-        for(int i = 0; i < particles_.size(); i++)
+        if(total_weight > 0)
         {
-           particles_[i]->weight_ = particles_[i]->weight_/total_weight;
+        // Normalize weights
+            for(int i = 0; i < particles_.size(); i++)
+            {
+               particles_[i]->weight_ = particles_[i]->weight_/total_weight;
+            }
         }
-
+        else
+        {
+            for(int i = 0; i < particles_.size(); i++)
+            {
+                ROS_WARN("PersonParticleFilter:: All particles have 0 weight. Re-normalizing.");
+                particles_[i]->weight_ = 1.0/particles_.size();
+            }
+        }
         RfidSensorData *curr_obs = (RfidSensorData *)&obs_data;
         RfidSensorData *prev_obs = (RfidSensorData *)last_obs_;
         *prev_obs = *curr_obs;
@@ -175,6 +185,46 @@ void PersonParticleFilter::update(SensorData &obs_data)
     }
     else
         ROS_ERROR("Filter has no sensor model to update");
+}
+
+/** \brief Static version of the update function
+\param rfid_model Sensor model
+\param particles Positions of current particles
+\param obs_data Observation to update
+\param prev_weights Particle weights before updating
+\param updated_weights Particle weights after updating
+*/
+void PersonParticleFilter::update(RfidSensorModel &rfid_model,
+                                  vector<Particle*> &particles,
+                                  SensorData &obs_data,
+                                  const vector<double>& prev_weights,
+                                  vector<double>& updated_weights)
+{
+    double total_weight = 0.0;
+
+    // Update weights. We assume all observations are from RFID sensor
+    for(int i = 0; i < particles.size(); i++)
+    {
+        updated_weights[i] = prev_weights[i]*rfid_model.applySensorModel(obs_data, particles[i]);
+        total_weight += updated_weights[i];
+    }
+
+    if(total_weight > 0)
+    {
+    // Normalize weights
+        for(int i = 0; i < updated_weights.size(); i++)
+        {
+            updated_weights[i] = updated_weights[i]/total_weight;
+        }
+    }
+    else
+    {
+        for(int i = 0; i < particles.size(); i++)
+        {
+            ROS_WARN("PersonParticleFilter:: All particles have 0 weight. Re-normalizing.");
+            updated_weights[i] = 1.0/particles.size();
+        }
+    }
 }
 
 /** Resample the current set of particles according to the probability distribution
@@ -198,18 +248,11 @@ void PersonParticleFilter::resample()
     particles_.clear();
 
     // Replace with new set
-    double total_weight = 0.0;
     for(int i = 0; i < resampled_particles.size(); i++)
     {
         particles_.push_back((Particle *)(resampled_particles[i]));
-        total_weight += resampled_particles[i]->weight_;
-    }
-
-    // Normalize
-    for(int i = 0; i < particles_.size(); i++)
-    {
         PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);
-        part_ptr->weight_ = part_ptr->weight_/total_weight;
+        part_ptr->weight_ = 1.0/resampled_particles.size();
     }
 
     prev_step_info_ = false;
@@ -279,6 +322,53 @@ double PersonParticleFilter::entropyParticles()
     return entropy;
 }
 
+/** \brief Static version of the entropy calculation function (for performance reasons)
+\param rfid_model Sensor model to update
+\param particles Current particles' positions
+\param obs Last observation
+\param prev_weights Particle weights before updating
+\param current_weights Particle weights after updating
+*/
+double
+PersonParticleFilter::
+entropyParticles(RfidSensorModel &rfid_model,
+                 vector<Particle*> &particles,
+                 SensorData &obs,
+                 const vector<double>& prev_weights,
+                 const vector<double>& current_weights)
+{
+    double entropy = 0.0;
+
+    double obs_prob;
+    double first_term = 0.0;
+    double second_term = 0.0;
+
+    /*
+      entropy = log{ Sum_{s_i in S}( p(s_i(k-1)) * p(z(k))|s_i(k)) )} -
+      Sum{s_i in S}( log{ p(z(k)|s_i(k)) } * p(s_i(k)) )
+
+      When p(s_i(k) | Z(k)) = 0 for all i, the entropy converges to 0
+      (see the original derivation and remember that lim_{x->0} x log(x) = 0)
+      */
+
+    for(int i = 0; i < particles.size(); i++)
+    {
+        obs_prob = rfid_model.applySensorModel(obs, particles[i]);
+        if(obs_prob > 0)
+        {
+            first_term += obs_prob*prev_weights[i];
+            second_term += log(obs_prob)*current_weights[i];
+        }
+    }
+
+    if(first_term == 0)
+        entropy = 0;
+    else
+        entropy = log(first_term) - second_term;
+
+    return entropy;
+}
+
 /** \brief Compute entropy of probability distribution as an approximation.
  The approximation is based on a bound for the entropy of a Gaussian Mixture Model.
  The set of particles can be approximated as a GMM.
@@ -303,6 +393,30 @@ double PersonParticleFilter::entropyGMM()
 
     return entropy;
 }
+
+/** \brief Static version of the entropy calculation function (for performance reasons)
+\param current_weights Current particle weights
+\param sigma_pose Standard deviation for person movement
+  */
+double PersonParticleFilter::entropyGMM(const vector<double>& current_weights, double sigma_pose)
+{
+    double w;
+    double entropy = 0.0;
+
+    if(sigma_pose > 0.0)
+    {
+        for(int i = 0; i < current_weights.size(); i++)
+        {
+            w = current_weights[i];
+            entropy += w*(-log(w) + 0.5*log(pow(2*M_PI*exp(1),2)*pow(sigma_pose,4)));
+        }
+    }
+    else
+        ROS_ERROR("Entropy cannot be computed without prediction model");
+
+    return entropy;
+}
+
 
 /** Initialize filter with a specific set of particles
   \param particle_set Particle set to initialize
@@ -331,9 +445,8 @@ void PersonParticleFilter::initFromParticles(const sensor_msgs::PointCloud &part
     // Copy particles from particle set
     for(int i = 0; i < num_particles; i++)
     {
-        if(particles_[i] == 0) particles_[i] = new Particle();
+        if(particles_[i] == 0) particles_[i] = (Particle*) (new PersonParticle());
         PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);
-
         part_ptr->pose_[0] = particle_set.points[i].x;
         part_ptr->pose_[1] = particle_set.points[i].y;
         part_ptr->weight_ = particle_set.channels[weights_channel].values[i];

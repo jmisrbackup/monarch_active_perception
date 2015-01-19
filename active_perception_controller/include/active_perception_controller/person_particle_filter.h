@@ -37,10 +37,21 @@ public:
     void initUniform();
     void predict(double timeStep);
     void update(SensorData &obs_data);
+    static void update(RfidSensorModel &rfid_model,
+                       vector<Particle*> &particles,
+                       SensorData &obs,
+                       const vector<double>& prev_weights,
+                       vector<double>& updated_weights);
     void resample();
     void setSensorModel(RfidSensorModel *model);
     double entropyParticles();
+    static double entropyParticles(RfidSensorModel &rfid_model,
+                                   vector<Particle*> &particles,
+                                   SensorData &new_obs,
+                                   const vector<double>& prev_weights,
+                                   const vector<double>& current_weights);
     double entropyGMM();
+    static double entropyGMM(const vector<double>& current_weights, double sigma_pose);
 
     void initFromParticles(const sensor_msgs::PointCloud &particle_set);
 

@@ -39,12 +39,19 @@ class MotionPlanner():
                                                       PointCloud,
                                                       self.target_particle_cloud_cb,
                                                       queue_size=1)
+
         self._robot_pose = PoseWithCovariance()
         
-        self._test_pub = rospy.Publisher("rrt",
+        self._rrt_pub = rospy.Publisher("rrt",
                                          Path,
                                          queue_size=1,
                                          latch = True)
+
+        self._path_pub = rospy.Publisher("best_path",
+                                         Path,
+                                         queue_size=1,
+                                         latch = True)
+
         
         getmap = rospy.ServiceProxy('static_map', GetMap)
         
@@ -64,6 +71,7 @@ class MotionPlanner():
         
         self._rrt_eta = rospy.get_param("rrt_eta", 1.0) # Notation from Karaman & Frazolli, 2011
         self._rrt_lim = rospy.get_param("rrt_lim", 100)
+	sigma_person = rospy.get_param("sigma_person", 0.05)
         
         self._planned = False # This is just for testing purposes. Delete me!
         mapdata = np.asarray(self._navmap.data, dtype=np.int8).reshape(height, width)
@@ -72,7 +80,8 @@ class MotionPlanner():
         
         pkgpath = roslib.packages.get_pkg_dir('active_perception_controller')
         self.utility_function = ap_utility.Utility(str(pkgpath) + "/config/sensormodel.png",
-                                                   0.1034)
+                                                   0.1034, sigma_person)
+        self.current_weights = []
         self._lock.release()
         
     def robot_pose_cb(self, msg):
@@ -83,6 +92,8 @@ class MotionPlanner():
         buf = StringIO()
         msg.serialize(buf)
         self.utility_function.setPersonParticles(buf.getvalue())
+        channel = [c for c in msg.channels if c.name == 'weights']
+        self.current_weights = channel[0].values
         
         self.plan()
         self._lock.release()
@@ -130,14 +141,14 @@ class MotionPlanner():
         V = [probot]
         E = {}
         parents = {}
+        W = [self.current_weights]
         C = [0.0]
+        I = [0.0]
         nbrs = NearestNeighbors(n_neighbors=1)
         nbrs.fit(V)
         cmin = 0
         t1 = time.time()
-        
-        #u = ap_utility.computeInfoGain(targets, self._robot_pose, 0)
-        
+                
         while len(V) < self._rrt_lim:
             t2 = time.time()
             """
@@ -162,8 +173,14 @@ class MotionPlanner():
                 Pnear_idx = nbrs.radius_neighbors(pnew, r, return_distance = False)
                 Pnear_idx = Pnear_idx[0]
                 pmin_idx = pnearest_idx
-                i = self.utility_function.computeInfoGain(pnew[0], pnew[1])
-                cmin = C[pnearest_idx] + np.linalg.norm(pnearest-pnew)
+                w = ap_utility.VectorOfDoubles()
+                w_post = ap_utility.VectorOfDoubles()
+                w.extend(W[pnearest_idx])
+
+                i = self.utility_function.computeInfoGain(pnew[0], pnew[1], 0.0, w, w_post)
+		# TODO Pose yaw is always evaluated in 0.0. Sensor model assumed isotropic
+
+                cmin = i # C[pnearest_idx] + np.linalg.norm(pnearest-pnew)
                 for p_idx in Pnear_idx:
                     c = C[p_idx] + np.linalg.norm(V[p_idx]-pnew)
                     if (self.segment_safe(V[p_idx],pnew) is True and 
@@ -178,6 +195,8 @@ class MotionPlanner():
                 pnew_idx = len(V)
                 V.append(pnew)
                 C.append(cmin)
+                W.append(w_post)
+                I.append(i)
                 parents[pnew_idx] = pmin_idx
                 """
                 Re-wire the tree
@@ -193,8 +212,10 @@ class MotionPlanner():
                             E[pnew_idx] = set([p_idx])              
                 nbrs.fit(V)
             print 'iteration done. time: ', time.time()-t2
+            print 'min entropy:', np.min(I)
         print 'total time: ', time.time()-t1
         self.publish_rrt(V,E) 
+        self.publish_best_path(parents, V, C)
 
     def publish_rrt(self, V,E):
         pt = Path()
@@ -208,7 +229,27 @@ class MotionPlanner():
             pose.pose.position.x = p[0]
             pose.pose.position.y = p[1]
             pt.poses.append(pose)
-        self._test_pub.publish(pt)
+        self._rrt_pub.publish(pt)
+        
+    def publish_best_path(self, parents, V, C):
+        pt = Path()
+        pt.header.frame_id = '/map'
+        m = np.argmin(C)
+        at_root = False
+        
+        while not at_root:
+            pose = PoseStamped()
+            pose.header.frame_id = '/map'
+            p = V[m]
+            pose.pose.position.x = p[0]
+            pose.pose.position.y = p[1]
+            pt.poses.append(pose)
+            if m == 0:
+                at_root = True
+            else:
+                m = parents[m]
+            
+        self._path_pub.publish(pt)
         
     def gen_path(self, ix, p_ix, V, E, path, vis ):
         path.append(V[ix])
