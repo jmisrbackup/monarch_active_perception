@@ -78,27 +78,29 @@ class PathParticleFilter:
         self.logprob += importance
 
     def resample(self):
-        # get normalized probabilities
-        n = int(math.ceil( self.RANDOM_FRAC*len(self.logprob) ))
-        m = len(self.logprob) - n
-        w = np.exp(self.logprob)
-        w /= w.sum()
-        # re-sample m samples
-        si  = scipy.linalg.toeplitz(w, np.zeros_like(w)).sum(axis=1)
-        rj  = (np.random.random() + np.arange(m)) / m
-        dij = si[:,None] - rj[None,:]
-        dij[dij<0] = np.inf
-        k   = dij.argmin(axis=0)
-        resampled = self.points[k]
-        if n>0:
-            # generate n new samples
-            total = self.cells.shape[1]
-            samples = [ tuple(self.cells[:,random.randint(0,total-1)]) for i in xrange(n) ]
-            new = np.array(samples, dtype=int)
-            self.points = np.vstack((resampled, new))
-        else:
-            self.points = resampled
-        self.logprob = np.zeros(len(self.points))
+        """low-variance resampling implementation"""
+        if len(self.logprob)>0:
+            # get normalized probabilities
+            n = int(math.ceil( self.RANDOM_FRAC*len(self.logprob) ))
+            m = len(self.logprob) - n
+            w = np.exp(self.logprob)
+            w /= w.sum()
+            # re-sample m samples
+            si  = scipy.linalg.toeplitz(w, np.zeros_like(w)).sum(axis=1)
+            rj  = (np.random.random() + np.arange(m)) / m
+            dij = si[:,None] - rj[None,:]
+            dij[dij<0] = np.inf
+            k = dij.argmin(axis=0)
+            resampled = self.points[k]
+            if n>0:
+                # generate n new samples
+                total = self.cells.shape[1]
+                samples = [ tuple(self.cells[:,random.randint(0,total-1)]) for i in xrange(n) ]
+                new = np.array(samples, dtype=int)
+                self.points = np.vstack((resampled, new))
+            else:
+                self.points = resampled
+            self.logprob = np.zeros(len(self.points))
 
     # TODO:
     def diffusion(self):
@@ -224,33 +226,6 @@ class MapParticleModel:
         free_hits = np.logical_and( np.abs(fix_angle(bj[None,:]-ti[:,None])) <= ANGLE_DELTA,
                                     dj2[None,:] < zi[:,None]**2 ).any(axis=0)
         print "free_hits:", free_hits.shape, free_hits.sum()
-        # -- visual debug zone --
-        if False:
-            for i in xrange(len(xi)):
-                coords = np.array([[xr, yr],
-                                   [xr + zi[i]*math.cos(ti[i]-ANGLE_DELTA), 
-                                    yr + zi[i]*math.sin(ti[i]-ANGLE_DELTA)],
-                                   [xr + zi[i]*math.cos(ti[i]+ANGLE_DELTA), 
-                                    yr + zi[i]*math.sin(ti[i]+ANGLE_DELTA)]])
-                p = plt.Polygon(coords, color='g', lw=0)
-                plt.gca().add_artist(p)
-                c = plt.Circle((xi[i],yi[i]), ri[i], color='r', lw=0)
-                plt.gca().add_artist(c)
-        if False:
-            for j in xrange(len(pj)):
-                l = plt.Line2D([xr, xr+math.sqrt(dj2[j])*math.cos(bj[j])],
-                               [yr, yr+math.sqrt(dj2[j])*math.sin(bj[j])])
-                plt.gca().add_artist(l)
-        if False:
-            plt.scatter([xr], [yr], c='k')
-            plt.scatter(xi, yi, c='m', marker='.', linewidth=0)
-            colors = np.empty_like(free_hits, dtype=str)
-            colors[:] = 'b'
-            colors[free_hits] = 'g'
-            colors[occ_hits]  = 'r'
-            plt.scatter(pj, qj, c=colors, marker='.', linewidth=0)
-            plt.show()
-        # -- // --
         # part of particles_within table which fall within free and occupied zones
         parts_free = particles_within[free_hits]
         parts_occ  = particles_within[occ_hits]
@@ -266,7 +241,7 @@ class MapParticleModel:
                 occ_mask = (parts_occ[:,2] == k)
                 occ_idx  = parts_occ[occ_mask,3].astype(int)
                 importance[occ_idx] = OCC_LOGPROB
-            print k, importance
+            #print k, importance
             pf.apply_importance(importance)
         
     def resample(self):
@@ -345,30 +320,93 @@ def test4(state="path_filters.state", scan="scan.state"):
         pose = data['pose']
     # 4. compute importance
     mpm.compute_importance(scan, pose)
+    #
+    ## prepare data
+    (position, quaternion) = pose
+    z = np.array(scan.ranges)
+    a = np.arange(scan.angle_min, scan.angle_min+scan.angle_increment*len(z), scan.angle_increment)
+    assert len(z)==len(a), "Range and angle arrays do not match"
+    # discard invalid ranges
+    valid = np.isfinite(z)
+    zv = z[valid]
+    valid[valid] = (zv>scan.range_min) & (zv<scan.range_max)
+    assert valid.any(), "No valid scan line found"
+    zi, ai = z[valid], a[valid]
+    # obtain laser pointcloud in device coordinates
+    xl = zi*np.cos(ai)
+    yl = zi*np.sin(ai)
+    print "laser points:", len(xl), "=", len(yl)
+    # transform pointcloud according to tf
+    (xr, yr, zr) = position
+    T = tf.transformations.quaternion_matrix(quaternion)
+    R = T[0:3,0:3]
+    pl = np.vstack([xl, yl, np.zeros_like(zi)])
+    pb = np.dot(R, pl)
+    xi = pb[0,:] + xr
+    yi = pb[1,:] + yr
+    # gather particles -- array of [x, y, logprob]
 
-    # ESTOU AQUI
+    # -- DEAD CODE BELOW --
+    # if False:
+    #     for i in xrange(len(xi)):
+    #         coords = np.array([[xr, yr],
+    #                            [xr + zi[i]*math.cos(ti[i]-ANGLE_DELTA), 
+    #                             yr + zi[i]*math.sin(ti[i]-ANGLE_DELTA)],
+    #                            [xr + zi[i]*math.cos(ti[i]+ANGLE_DELTA), 
+    #                             yr + zi[i]*math.sin(ti[i]+ANGLE_DELTA)]])
+    #         p = plt.Polygon(coords, color='g', lw=0)
+    #         plt.gca().add_artist(p)
+    #         c = plt.Circle((xi[i],yi[i]), ri[i], color='r', lw=0)
+    #         plt.gca().add_artist(c)
+    # if False:
+    #     for j in xrange(len(pj)):
+    #         l = plt.Line2D([xr, xr+math.sqrt(dj2[j])*math.cos(bj[j])],
+    #                        [yr, yr+math.sqrt(dj2[j])*math.sin(bj[j])])
+    #         plt.gca().add_artist(l)
+    # if False:
+    #     plt.scatter([xr], [yr], c='k')
+    #     plt.scatter(xi, yi, c='m', marker='.', linewidth=0)
+    #     colors = np.empty_like(free_hits, dtype=str)
+    #     colors[:] = 'b'
+    #     colors[free_hits] = 'g'
+    #     colors[occ_hits]  = 'r'
+    #     plt.scatter(pj, qj, c=colors, marker='.', linewidth=0)
+    #     plt.show()
+    # --//--
 
+    pln = mpm.pln
+    l, r, b, t = pln.x0, pln.x0+pln.scale*(pln.W-1), pln.y0, pln.y0+pln.scale*(pln.H-1)
     #
-    plt.subplot(131)
-    img = np.zeros(mpm.pln.occgrid.shape)
-    for p in mpm.filters:
-        img[p.points[:,0], p.points[:,1]] = 1
-    plt.imshow(img, cmap=cm.gray_r)
-    #
-    plt.subplot(132)
-    img = -np.ones(mpm.pln.occgrid.shape)
-    for p in mpm.filters:
-        img[p.points[:,0], p.points[:,1]] = p.logprob
-    plt.imshow(img)
-    #
+    plt.subplot(121)
+    particles = np.vstack( [ np.hstack( [ pf.points, pf.logprob[:,None] ] )
+                             for pf in mpm.filters ] )
+    plt.imshow(pln.occgrid, cmap=cm.gray_r, extent=(l,r,b,t))
+    plt.scatter([xr], [yr], c='k')
+    plt.scatter(xi, yi, c='m', marker='.', linewidth=0)
+    plt.scatter(particles[:,0], particles[:,1], c=particles[:,2], marker='.', linewidth=0)
+    plt.gca().axes.set_aspect('equal')
+
     # 5. resample
     mpm.resample()
     #
-    plt.subplot(133)
-    img = np.zeros(mpm.pln.occgrid.shape)
-    for p in mpm.filters:
-        img[p.points[:,0], p.points[:,1]] = 1
-    plt.imshow(img, cmap=cm.gray_r)
+
+    plt.subplot(122)
+    particles = np.vstack( [ np.hstack( [ pf.points, pf.logprob[:,None] ] )
+                             for pf in mpm.filters ] )
+    plt.imshow(pln.occgrid, cmap=cm.gray_r, extent=(l,r,b,t))
+    plt.scatter([xr], [yr], c='k')
+    plt.scatter(xi, yi, c='m', marker='.', linewidth=0)
+    plt.scatter(particles[:,0], particles[:,1], c=particles[:,2], marker='.', linewidth=0)
+    plt.gca().axes.set_aspect('equal')
+
+    plt.show()
+
+
+    # plt.subplot(133)
+    # img = np.zeros(mpm.pln.occgrid.shape)
+    # for p in mpm.filters:
+    #     img[p.points[:,0], p.points[:,1]] = 1
+    # plt.imshow(img, cmap=cm.gray_r)
     #
 
     
@@ -388,8 +426,7 @@ def test4(state="path_filters.state", scan="scan.state"):
     #
     plt.show()
 
-
-    
+   
 
 def test5(state="scan.state"):
     """extract a scan.state from the first scan found"""
