@@ -388,7 +388,8 @@ double PersonParticleFilter::entropyGMM()
         for(int i = 0; i < particles_.size(); i++)
         {
             w = particles_[i]->weight_;
-            entropy += w*(-log(w) + 0.5*log(pow(2*M_PI*exp(1),2)*pow(sigma_pose_,4)));
+            if( w > 0 )
+                entropy += w*(-log(w) + 0.5*log(pow(2*M_PI*exp(1),2)*pow(sigma_pose_,4)));
         }
     }
     else
@@ -411,7 +412,8 @@ double PersonParticleFilter::entropyGMM(const vector<double>& current_weights, d
         for(int i = 0; i < current_weights.size(); i++)
         {
             w = current_weights[i];
-            entropy += w*(-log(w) + 0.5*log(pow(2*M_PI*exp(1),2)*pow(sigma_pose,4)));
+            if( w > 0 )
+                entropy += w*(-log(w) + 0.5*log(pow(2*M_PI*exp(1),2)*pow(sigma_pose,4)));
         }
     }
     else
