@@ -16,7 +16,6 @@ Panels:
         - /Path2
         - /Best Path1
         - /PointCloud1
-        - /PointCloud1/Status1
       Splitter Ratio: 0.5
     Tree Height: 535
   - Class: rviz/Selection
@@ -188,7 +187,7 @@ Visualization Manager:
       Max Color: 0; 255; 0
       Max Intensity: 0
       Min Color: 0; 0; 0
-      Min Intensity: -0.17243
+      Min Intensity: -0.00768124
       Name: PointCloud
       Position Transformer: XYZ
       Queue Size: 10
@@ -198,7 +197,7 @@ Visualization Manager:
       Style: Spheres
       Topic: /entropy_points
       Use Fixed Frame: true
-      Use rainbow: true
+      Use rainbow: false
       Value: true
   Enabled: true
   Global Options:
@@ -257,5 +256,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1200
-  X: 1479
+  X: 1469
   Y: 14
