@@ -304,7 +304,7 @@ double PersonParticleFilter::entropyParticles()
                 if(obs_prob > 0)
                 {
                     first_term += obs_prob*prev_weights_[i];
-                    second_term += log(obs_prob)*particles_[i]->weight_;
+                    second_term += log(obs_prob*prev_weights_[i])*particles_[i]->weight_;
                 }
             }
 
@@ -357,7 +357,7 @@ entropyParticles(RfidSensorModel &rfid_model,
         if(obs_prob > 0)
         {
             first_term += obs_prob*prev_weights[i];
-            second_term += log(obs_prob)*current_weights[i];
+            second_term += log(obs_prob*prev_weights[i])*current_weights[i];
         }
     }
 
