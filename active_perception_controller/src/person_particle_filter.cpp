@@ -198,15 +198,18 @@ void PersonParticleFilter::update(RfidSensorModel &rfid_model,
                                   vector<Particle*> &particles,
                                   SensorData &obs_data,
                                   const vector<double>& prev_weights,
-                                  vector<double>& updated_weights)
+                                  vector<double>& updated_weights,
+                                  const vector<size_t>& use_particle_idx)
 {
-    double total_weight = 0.0;
+    double total_weight = 1.0; //we assume that the previous weights are already normalized
 
     // Update weights. We assume all observations are from RFID sensor
-    for(int i = 0; i < particles.size(); i++)
+    for(int i = 0; i < use_particle_idx.size(); i++)
     {
-        updated_weights[i] = prev_weights[i]*rfid_model.applySensorModel(obs_data, particles[i]);
-        total_weight += updated_weights[i];
+        size_t idx = use_particle_idx[i];
+        updated_weights[idx] = prev_weights[idx]*rfid_model.applySensorModel(obs_data, particles[idx]);
+        total_weight -= prev_weights[idx];
+        total_weight += updated_weights[idx];
     }
 
     if(total_weight > 0)

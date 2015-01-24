@@ -41,7 +41,8 @@ public:
                        vector<Particle*> &particles,
                        SensorData &obs,
                        const vector<double>& prev_weights,
-                       vector<double>& updated_weights);
+                       vector<double>& updated_weights,
+                       const vector<size_t>& use_particle_idx);
     void resample();
     void setSensorModel(RfidSensorModel *model);
     double entropyParticles();
@@ -51,7 +52,8 @@ public:
                                    const vector<double>& prev_weights,
                                    const vector<double>& current_weights);
     double entropyGMM();
-    static double entropyGMM(const vector<double>& current_weights, double sigma_pose);
+    static double entropyGMM(const vector<double>& current_weights,
+                             double sigma_pose);
 
     void initFromParticles(const sensor_msgs::PointCloud &particle_set);
 

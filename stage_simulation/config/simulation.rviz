@@ -13,9 +13,12 @@ Panels:
         - /LaserScan1
         - /Person Particle Cloud1
         - /Map2
-        - /Path2
+        - /RRT1
         - /Best Path1
-        - /PointCloud1
+        - /RRT Entropy 1
+        - /DWA Costmap1
+        - /MoveBase Global Path1
+        - /DWA Path1
       Splitter Ratio: 0.5
     Tree Height: 535
   - Class: rviz/Selection
@@ -84,10 +87,10 @@ Visualization Manager:
       Buffer Length: 1
       Class: rviz/Path
       Color: 25; 255; 0
-      Enabled: true
+      Enabled: false
       Name: Path
       Topic: /move_base/TrajectoryPlannerROS/global_plan
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -129,12 +132,12 @@ Visualization Manager:
       Color: 255; 255; 0
       Color Transformer: Intensity
       Decay Time: 0
-      Enabled: false
+      Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 0
-      Max Intensity: 0.000200002
+      Max Intensity: 0.0002
       Min Color: 0; 0; 0
-      Min Intensity: 0.000192943
+      Min Intensity: 0.0002
       Name: Person Particle Cloud
       Position Transformer: XYZ
       Queue Size: 10
@@ -145,7 +148,7 @@ Visualization Manager:
       Topic: /person_particle_cloud
       Use Fixed Frame: true
       Use rainbow: false
-      Value: false
+      Value: true
     - Alpha: 0.7
       Class: rviz/Map
       Color Scheme: costmap
@@ -159,7 +162,7 @@ Visualization Manager:
       Class: rviz/Path
       Color: 255; 0; 0
       Enabled: true
-      Name: Path
+      Name: RRT
       Topic: /rrt
       Value: true
     - Alpha: 1
@@ -185,10 +188,10 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 0; 255; 0
-      Max Intensity: 0
+      Max Intensity: 5.35506
       Min Color: 0; 0; 0
-      Min Intensity: -0.00768124
-      Name: PointCloud
+      Min Intensity: 5.19369
+      Name: "RRT Entropy "
       Position Transformer: XYZ
       Queue Size: 10
       Selectable: true
@@ -199,6 +202,51 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: false
       Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: goal_cost
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 0
+      Enabled: false
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 53
+      Min Color: 0; 0; 0
+      Min Intensity: 3
+      Name: DWA Costmap
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.1
+      Style: Flat Squares
+      Topic: /move_base/TrajectoryPlannerROS/cost_cloud
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: false
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz/Path
+      Color: 25; 255; 0
+      Enabled: false
+      Name: MoveBase Global Path
+      Topic: /move_base/TrajectoryPlannerROS/global_plan
+      Value: false
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz/Path
+      Color: 255; 0; 0
+      Enabled: false
+      Name: DWA Path
+      Topic: /move_base/TrajectoryPlannerROS/local_plan
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -223,22 +271,22 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 27.1897
+      Distance: 32.0971
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -5.34038
-        Y: 0.55143
-        Z: -1.96628
+        X: -7.24487
+        Y: -2.27656
+        Z: -4.92885
       Name: Current View
       Near Clip Distance: 0.01
       Pitch: 0.8554
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.11039
+      Yaw: 4.11539
     Saved: ~
 Window Geometry:
   Displays:
@@ -256,5 +304,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1200
-  X: 1469
+  X: 55
   Y: 14

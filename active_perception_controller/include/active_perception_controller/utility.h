@@ -24,6 +24,7 @@ public:
                            float yaw,
                            std::vector<double>& prev_weights,
                            std::vector<double>& updated_weights);
+    double getMaximumSensorRange();
 private:
     std::vector<Particle*> person_particles_;
     boost::shared_ptr<RfidSensorModel> sensor_model_;
@@ -37,7 +38,8 @@ BOOST_PYTHON_MODULE(ap_utility)
     class_<Utility>("Utility")
         .def(init<std::string, float, double>())
         .def("setPersonParticles", &Utility::setPersonParticles)
-        .def("computeInfoGain", &Utility::computeInfoGain);
+        .def("computeInfoGain", &Utility::computeInfoGain)
+        .def("getMaximumSensorRange", &Utility::getMaximumSensorRange);
 
     class_<std::vector<double> >("VectorOfDoubles")
             .def(vector_indexing_suite<std::vector<double> >() )

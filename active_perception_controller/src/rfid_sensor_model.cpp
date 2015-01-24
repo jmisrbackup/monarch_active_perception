@@ -8,6 +8,7 @@
 #include <active_perception_controller/rfid_sensor_model.h>
 #include <active_perception_controller/person_particle_filter.h>
 #include <tf/transform_datatypes.h>
+#include <math.h>
 
 using namespace tf;
 /** Constructor
@@ -71,4 +72,10 @@ double RfidSensorModel::applySensorModel(SensorData &obs_data, const Particle *p
         return det_prob; //TODO: should be P(true positive)*det_prob + P(false positive)
     else
         return 1-det_prob; //TODO: should be P(true negative)*(1-det_prob) + P(false negative)
+}
+
+/** Get the maximum range of the RFID sensor */
+double RfidSensorModel::getMaximumSensorRange()
+{
+    return hypot(prob_map_.rows, prob_map_.cols)*map_resolution_/2.0;
 }

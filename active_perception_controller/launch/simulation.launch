@@ -13,24 +13,33 @@
 	<param name="sigma_person" type="double" value="0.05" />
 	<param name="rfid_map_resolution" type="double" value="0.06" />
 	<param name="rfid_prob_map" type="string" value="$(find active_perception_controller)/config/sensormodel.png" />
-
     </node>
-
-    <!--node pkg="active_perception_controller" type="motion_planner.py" name="entropy_motion_planner" output="screen"/-->
     
-    <!--node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+    <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
         <rosparam file="$(find stage_simulation)/config/costmap_common_params_stage.yaml" command="load" ns="global_costmap" />
         <rosparam file="$(find stage_simulation)/config/costmap_common_params_stage.yaml" command="load" ns="local_costmap" />
         <rosparam file="$(find stage_simulation)/config/local_costmap_params.yaml" command="load" />
         <rosparam file="$(find stage_simulation)/config/global_costmap_params.yaml" command="load" />
         <rosparam file="$(find stage_simulation)/config/base_local_planner_params.yaml" command="load" />
-        <param name="base_global_planner" type="string" value="navfn/NavfnROS" />
+        <!--rosparam file="$(find stage_simulation)/config/dwa_local_planner_params.yaml" command="load" /-->
+        <param name="base_global_planner" type="string" value="active_perception_interface/ActivePerceptionInterface" />
+	<!--param name="base_local_planner" type="string" value="dwa_local_planner/DWAPlannerROS" /-->
         <param name="controller_frequency" type="double" value="20.0" />
         <rosparam param="recovery_behaviors">[{name: conservative_reset, type: clear_costmap_recovery/ClearCostmapRecovery},
                                               {name: aggressive_reset, type: clear_costmap_recovery/ClearCostmapRecovery}]</rosparam>
-        <param name="planner_frequency" type="double" value="0.1"/>
-        <param name="planner_patience" type="double" value="2.0"/>
+        <param name="planner_patience" type="double" value="30.0"/>
         <param name="controller_patience" type="double" value="60.0"/>
         <remap from="map" to="/map"/>
-    </node-->
+    </node>
+    
+    <node pkg="active_perception_controller" type="motion_planner.py" name="entropy_motion_planner" output="screen">
+	    <param name="rrt_nearest_part_bias" type="double" value="0.2" />
+	    <param name="rrt_total_dist_bias" type="double" value="0.05" />
+	    <param name="rrt_entropy_bias" type="double" value="10" />
+	    <param name="max_rrt_iterations" type="int" value="500" />
+	    <param name="max_path_size" type="int" value="20" />	
+	    <param name="rrt_eta" type="double" value="0.5" />
+    </node>
+    
+    <node pkg="active_perception_controller" type="active_perception_task_node.py" name="active_perception_task_node"/>    
 </launch>

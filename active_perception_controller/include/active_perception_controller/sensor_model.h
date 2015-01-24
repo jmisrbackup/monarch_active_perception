@@ -25,6 +25,7 @@ class SensorModel
 public:
 
     virtual double applySensorModel(SensorData &obs_data, const Particle *particle) = 0;
+    virtual double getMaximumSensorRange() = 0;
 };
 
 

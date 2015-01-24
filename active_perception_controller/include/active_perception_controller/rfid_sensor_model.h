@@ -33,7 +33,7 @@ public:
     RfidSensorModel(const std::string& prob_image_path, double resolution);
 
     double applySensorModel(SensorData &obs_data, const Particle *particle);
-
+    double getMaximumSensorRange();
 private:
     double map_resolution_;     ///< Resolution of map in meter/pixel
     cv::Mat prob_map_;           ///< Map of observation probability

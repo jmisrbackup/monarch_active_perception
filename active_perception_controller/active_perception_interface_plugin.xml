@@ -1,0 +1,5 @@
+<library path="lib/libactive_perception_interface_lib">
+  <class name="active_perception_interface/ActivePerceptionInterface" type="active_perception_interface::ActivePerceptionInterface" base_class_type="nav_core::BaseGlobalPlanner">
+    <description>move_base plugin that acts as an interface to the Active Perception motion_planner</description>
+  </class>
+</library>

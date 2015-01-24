@@ -5,7 +5,7 @@ set(CMAKE_BUILD_TYPE Debug)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED roscpp geometry_msgs std_msgs nav_msgs roslib)
+find_package(catkin REQUIRED message_generation roscpp geometry_msgs std_msgs nav_msgs roslib)
 
 ## System dependencies are found with CMake's conventions
 find_package( Boost REQUIRED COMPONENTS python )
@@ -49,11 +49,10 @@ catkin_python_setup()
 # )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+add_service_files(
+   FILES
+   ActivePerceptionPlan.srv
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -63,10 +62,10 @@ catkin_python_setup()
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs  # Or other packages containing msgs
-# )
+generate_messages(
+   DEPENDENCIES
+   nav_msgs
+)
 
 ###################################
 ## catkin specific configuration ##
@@ -80,7 +79,7 @@ catkin_python_setup()
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ap_utility
-#  CATKIN_DEPENDS other_catkin_pkg
+  CATKIN_DEPENDS message_runtime
 #  DEPENDS system_lib
 )
 
@@ -97,6 +96,8 @@ include_directories(include ${OpenCV_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${PYTHO
 add_library(ap_utility
    src/utility.cpp src/person_estimator.cpp src/particle_filter.cpp src/person_particle_filter.cpp src/rfid_sensor_model.cpp
 )
+
+add_library(active_perception_interface_lib src/active_perception_interface.cpp)
 
 target_link_libraries(ap_utility gsl gslcblas ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${Boost_LIBRARIES} ${PYTHON_LIBRARIES})
 

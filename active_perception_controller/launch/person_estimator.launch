@@ -1,0 +1,12 @@
+<launch>
+    
+    <node pkg="active_perception_controller" type="person_estimator" name="estimator" output="screen">
+	<param name="step_duration" type="double" value="0.2" />
+	<param name="num_particles" type="int" value="5000" />
+	<param name="sigma_person" type="double" value="0.05" />
+	<param name="rfid_map_resolution" type="double" value="0.06" />
+	<param name="rfid_prob_map" type="string" value="$(find active_perception_controller)/config/sensormodel.png" />
+
+    </node>
+
+</launch>

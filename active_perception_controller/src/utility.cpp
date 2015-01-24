@@ -88,7 +88,8 @@ double Utility::computeInfoGain(float px,
     prev_weights.resize(person_particles_.size(),0);
     updated_weights.resize(person_particles_.size(),0);
     vector<double> det_weights(person_particles_.size(),0);
-    vector<double> ndet_weights(person_particles_.size(),0);
+    vector<size_t> use_particle_idx;
+    //vector<double> ndet_weights(person_particles_.size(),0);
 
     double prob_det = 0.0, prob_ndet;
     RfidSensorData rfid_obs;
@@ -101,8 +102,17 @@ double Utility::computeInfoGain(float px,
 
     for(int i = 0; i < person_particles_.size(); i++)
     {
-        Particle *part_ptr = person_particles_[i];
-        prob_det += prev_weights[i]*sensor_model_->applySensorModel(rfid_obs, part_ptr);
+        PersonParticle *part_ptr = (PersonParticle*) person_particles_[i];
+        if(hypot(part_ptr->pose_[0] - px, part_ptr->pose_[1] - py) <= getMaximumSensorRange())
+        {
+            prob_det += prev_weights[i]*sensor_model_->applySensorModel(rfid_obs, (Particle*) part_ptr);
+            use_particle_idx.push_back(i);
+        }
+        else
+        {
+            updated_weights[i] = prev_weights[i]; //ndet
+            det_weights[i] = 0;
+        }
     }
 
     prob_ndet = 1.0 - prob_det;
@@ -116,7 +126,8 @@ double Utility::computeInfoGain(float px,
                                  person_particles_,
                                  rfid_obs,
                                  prev_weights,
-                                 det_weights);
+                                 det_weights,
+                                 use_particle_idx);
 
 //    entropy_det = PersonParticleFilter::entropyParticles(*(sensor_model_.get()),
 //                                                         person_particles_,
@@ -137,7 +148,9 @@ double Utility::computeInfoGain(float px,
                                  person_particles_,
                                  rfid_obs,
                                  prev_weights,
-                                 ndet_weights);
+                                 //ndet_weights);
+                                 updated_weights,
+                                 use_particle_idx);
 
     //entropy_ndet = PersonParticleFilter::entropyParticles(*(sensor_model_.get()),
 //                                                          person_particles_,
@@ -146,14 +159,22 @@ double Utility::computeInfoGain(float px,
 //                                                          updated_weights);
 
     // Alternative method
-    entropy_ndet = PersonParticleFilter::entropyGMM(ndet_weights, sigma_pose_);
-
+    //entropy_ndet = PersonParticleFilter::entropyGMM(ndet_weights, sigma_pose_);
+    entropy_ndet = PersonParticleFilter::entropyGMM(updated_weights, sigma_pose_);
 
     /* Expected_H' = H'(z=yes)*p(z=yes) + H'(z=no)*p(z=no) */
     ROS_INFO_STREAM("pdet: " << prob_det << " entropy det " << entropy_det << " prob_ndet: " << prob_ndet << " entropy ndet " << entropy_ndet);
 
-    for(size_t i = 0; i < updated_weights.size(); i++)
-        updated_weights[i] = prob_det*det_weights[i] + prob_ndet*ndet_weights[i];
+    //for(size_t i = 0; i < updated_weights.size(); i++)
+        //updated_weights[i] = prob_det*det_weights[i] + prob_ndet*ndet_weights[i];
+        //updated_weights[i] = ndet_weights[i];
     //return entropy_ndet;
     return entropy_det*prob_det + entropy_ndet*prob_ndet;
+}
+
+
+double
+Utility::getMaximumSensorRange()
+{
+    return sensor_model_->getMaximumSensorRange();
 }
