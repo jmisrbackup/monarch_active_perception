@@ -65,17 +65,17 @@ void Utility::setPersonParticles(const std::string& serialized_particles)
     }
 }
 
-/**  This function computes the expected information gain for a future robot pose based on entropy gain.
-    Given the current belief over the person position, it is computed the entropy gain
+/**  This function computes the expected entropy for a future robot pose.
+    Given the current belief over the person position, it is computed the expected entropy
     by moving the robot to a future pose and taking a measurement there.
   \param px Future robot pose to evaluate
   \param py Future robot pose to evaluate
   \param yaw Future robot yaw to evaluate
   \param prev_weights Particle weights for current position
   \param updated_weights Particle weights after updating in future position. Expected values are computed
-  \return entropy_gain Expected entropy gain
+  \return exp_entropy Expected entropy
 */
-double Utility::computeInfoGain(float px,
+double Utility::computeExpEntropy(float px,
                                 float py,
                                 float yaw,
                                 vector<double>& prev_weights,
@@ -129,11 +129,11 @@ double Utility::computeInfoGain(float px,
                                  det_weights,
                                  use_particle_idx);
 
-//    entropy_det = PersonParticleFilter::entropyParticles(*(sensor_model_.get()),
-//                                                         person_particles_,
-//                                                         rfid_obs,
-//                                                         prev_weights,
-//                                                         det_weights);
+    //entropy_det = PersonParticleFilter::entropyParticles(*(sensor_model_.get()),
+    //                                                     person_particles_,
+    //                                                     rfid_obs,
+    //                                                     prev_weights,
+    //                                                     det_weights);
 
     // Alternative method
     entropy_det = PersonParticleFilter::entropyGMM(det_weights, sigma_pose_);
@@ -153,13 +153,12 @@ double Utility::computeInfoGain(float px,
                                  use_particle_idx);
 
     //entropy_ndet = PersonParticleFilter::entropyParticles(*(sensor_model_.get()),
-//                                                          person_particles_,
-//                                                          rfid_obs,
-//                                                          prev_weights,
-//                                                          updated_weights);
+    //                                                      person_particles_,
+    //                                                      rfid_obs,
+    //                                                      prev_weights,
+    //                                                      updated_weights);
 
     // Alternative method
-    //entropy_ndet = PersonParticleFilter::entropyGMM(ndet_weights, sigma_pose_);
     entropy_ndet = PersonParticleFilter::entropyGMM(updated_weights, sigma_pose_);
 
     /* Expected_H' = H'(z=yes)*p(z=yes) + H'(z=no)*p(z=no) */

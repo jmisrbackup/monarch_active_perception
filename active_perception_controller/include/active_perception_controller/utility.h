@@ -19,7 +19,7 @@ public:
             float resolution, double sigma_pose);
 
     void setPersonParticles(const std::string& serialized_particles);
-    double computeInfoGain(float px,
+    double computeExpEntropy(float px,
                            float py,
                            float yaw,
                            std::vector<double>& prev_weights,
@@ -38,7 +38,7 @@ BOOST_PYTHON_MODULE(ap_utility)
     class_<Utility>("Utility")
         .def(init<std::string, float, double>())
         .def("setPersonParticles", &Utility::setPersonParticles)
-        .def("computeInfoGain", &Utility::computeInfoGain)
+        .def("computeExpEntropy", &Utility::computeExpEntropy)
         .def("getMaximumSensorRange", &Utility::getMaximumSensorRange);
 
     class_<std::vector<double> >("VectorOfDoubles")

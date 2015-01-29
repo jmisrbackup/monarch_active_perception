@@ -193,6 +193,7 @@ void PersonParticleFilter::update(SensorData &obs_data)
 \param obs_data Observation to update
 \param prev_weights Particle weights before updating
 \param updated_weights Particle weights after updating
+\param use_particle_idx Particles used for updating
 */
 void PersonParticleFilter::update(RfidSensorModel &rfid_model,
                                   vector<Particle*> &particles,

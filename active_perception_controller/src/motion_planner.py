@@ -181,7 +181,7 @@ class MotionPlanner():
         w = ap_utility.VectorOfDoubles()
         w_post = ap_utility.VectorOfDoubles()
         w.extend(self.current_weights)
-        Ent = [self.utility_function.computeInfoGain(probot[0], probot[1], 0.0, w, w_post)]
+        Ent = [self.utility_function.computeExpEntropy(probot[0], probot[1], 0.0, w, w_post)]
         Dist = [0.0]
         C = [float('Inf')]
         nbrs = NearestNeighbors(n_neighbors=1)
@@ -224,7 +224,7 @@ class MotionPlanner():
                 (dist_nearest_particle, idx) = self._particle_nbrs.kneighbors(pnew)
 
                 if dist_nearest_particle < max_range: #if at least one particle is visible
-                    entropy = self.utility_function.computeInfoGain(pnew[0], pnew[1], 0.0, w, w_post)
+                    entropy = self.utility_function.computeExpEntropy(pnew[0], pnew[1], 0.0, w, w_post)
                 
                 if dist_nearest_particle >= max_range or entropy == 0: # utility function failed
                     entropy = Ent[pmin_idx]
@@ -242,7 +242,7 @@ class MotionPlanner():
                     w.extend(W[p_idx])
                     
                     if np.abs(Ent[p_idx] - entropy) < 1e-6: # if there is anything to gain in terms of information
-                        entropy_near = self.utility_function.computeInfoGain(pnew[0], pnew[1], 0.0, w, w_near)
+                        entropy_near = self.utility_function.computeExpEntropy(pnew[0], pnew[1], 0.0, w, w_near)
                     else:
                         entropy_near = Ent[p_idx]
                     
@@ -278,7 +278,7 @@ class MotionPlanner():
                         w_near = ap_utility.VectorOfDoubles()
                         w.extend(W[-1]) # pnew
                         if np.abs(Ent[p_idx] - entropy) < 1e-6: # if there is anything to gain in terms of information
-                            entropy_near = self.utility_function.computeInfoGain(pnew[0], pnew[1], 0.0, w, w_near)
+                            entropy_near = self.utility_function.computeExpEntropy(pnew[0], pnew[1], 0.0, w, w_near)
                         else:
                             entropy_near = Ent[p_idx]
                             w_near = w
