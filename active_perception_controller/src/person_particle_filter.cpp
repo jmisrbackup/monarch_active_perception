@@ -152,12 +152,23 @@ void PersonParticleFilter::update(SensorData &obs_data)
     if(local_sensor_ || external_sensor_)
     {
         // Update weights. We assume all observations are from RFID sensor
+        RfidSensorData *rfid_obs = (RfidSensorData *)&obs_data;
+
         for(int i = 0; i < particles_.size(); i++)
         {
             // Save previous information
             prev_weights_[i] = particles_[i]->weight_;
+            PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);
 
-            particles_[i]->weight_ = particles_[i]->weight_ * rfid_model_->applySensorModel(obs_data, particles_[i]);
+            if(hypot(part_ptr->pose_[0] - rfid_obs->pose_.pose.position.x, part_ptr->pose_[1] - rfid_obs->pose_.pose.position.y) <= rfid_model_->getMaximumSensorRange()) {
+                particles_[i]->weight_ = particles_[i]->weight_ * rfid_model_->applySensorModel(obs_data, particles_[i]);
+            }
+            else
+            {
+                if(rfid_obs->rfid_)
+                    particles_[i]->weight_ = 0.0;
+            }
+
             total_weight += particles_[i]->weight_;
         }
 
@@ -299,13 +310,15 @@ double PersonParticleFilter::entropyParticles()
               Sum{s_i in S}( log{ p(z(k)|s_i(k)) } * p(s_i(k)) )
 
               When p(s_i(k) | Z(k)) = 0 for all i, the entropy converges to 0
-              (see the original derivation and remember that lim_{x->0} x log(x) = 0)
+              (see the original derivation and remember that lim_{x->0} x log(x) = 0).
+              Particles with weight 0 or 0 probability to get observation will have
+              belief zero, so entropy zero. They do not contribute to the entropy.
               */
 
             for(int i = 0; i < particles_.size(); i++)
             {
                 obs_prob = rfid_model_->applySensorModel(*last_obs_, particles_[i]);
-                if(obs_prob > 0)
+                if(obs_prob > 0 && prev_weights_[i] > 0)
                 {
                     first_term += obs_prob*prev_weights_[i];
                     second_term += log(obs_prob*prev_weights_[i])*particles_[i]->weight_;
@@ -352,13 +365,15 @@ entropyParticles(RfidSensorModel &rfid_model,
       Sum{s_i in S}( log{ p(z(k)|s_i(k)) } * p(s_i(k)) )
 
       When p(s_i(k) | Z(k)) = 0 for all i, the entropy converges to 0
-      (see the original derivation and remember that lim_{x->0} x log(x) = 0)
+      (see the original derivation and remember that lim_{x->0} x log(x) = 0).
+      Particles with weight 0 or 0 probability to get observation will have
+      belief zero, so entropy zero. They do not contribute to the entropy.
       */
 
     for(int i = 0; i < particles.size(); i++)
     {
         obs_prob = rfid_model.applySensorModel(obs, particles[i]);
-        if(obs_prob > 0)
+        if(obs_prob > 0 && prev_weights[i] > 0)
         {
             first_term += obs_prob*prev_weights[i];
             second_term += log(obs_prob*prev_weights[i])*current_weights[i];
@@ -370,8 +385,8 @@ entropyParticles(RfidSensorModel &rfid_model,
     else
     {
         entropy = log(first_term) - second_term;
-        ROS_WARN_STREAM("first: " << first_term);
-        ROS_WARN_STREAM("second: " << second_term);
+        //ROS_WARN_STREAM("first: " << first_term);
+        //ROS_WARN_STREAM("second: " << second_term);
     }
     return entropy;
 }
