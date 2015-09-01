@@ -673,7 +673,6 @@ class MotionPlanner():
         h = self._navmap.info.height
         x = (idx%w)*res+xo
         y = ((idx)/w)*res+yo
-	print xo,yo
         return np.array([x,y])
         
     def sample_from_particles(self):
