@@ -298,8 +298,8 @@ class MotionPlanner():
     def plan(self):
         self._lock.acquire()
 	#self.area_allocation()
-        #path = self.rrtstar(self.sample_free_uniform)
-        path = self.rrtstar(self.sample_from_particles)
+        path = self.rrtstar(self.sample_free_uniform)
+        #path = self.rrtstar(self.sample_from_particles)
         self._lock.release()
         return path
         
@@ -672,7 +672,8 @@ class MotionPlanner():
         w = self._navmap.info.width
         h = self._navmap.info.height
         x = (idx%w)*res+xo
-        y = ((idx-x)/h)*res+yo
+        y = ((idx)/w)*res+yo
+	print xo,yo
         return np.array([x,y])
         
     def sample_from_particles(self):
