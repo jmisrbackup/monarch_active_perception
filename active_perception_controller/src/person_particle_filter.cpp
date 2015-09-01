@@ -97,7 +97,8 @@ void PersonParticleFilter::initUniform()
             PersonParticle * part_ptr = (PersonParticle *)(particles_[i]);
 
             part_ptr->pose_[0] = map_->info.origin.position.x + map_->info.resolution * free_point.first;
-            part_ptr->pose_[1] = - (map_->info.origin.position.y + map_->info.resolution * (map_->info.height - free_point.second));
+           // part_ptr->pose_[1] = - (map_->info.origin.position.y + map_->info.resolution * (map_->info.height - free_point.second));
+	    part_ptr->pose_[1] =  (map_->info.origin.position.y + map_->info.resolution * (free_point.second));
             part_ptr->weight_ = 1.0/num_particles;
         }
     }
@@ -124,7 +125,8 @@ void PersonParticleFilter::predict(double timeStep)
         if(map_ != NULL)
         {
             size_t map_x = floor((part_ptr->pose_[0] + dx - map_->info.origin.position.x)/map_->info.resolution);
-            size_t map_y = floor((part_ptr->pose_[1] + dy + map_->info.origin.position.y)/map_->info.resolution + map_->info.height);
+          //  size_t map_y = floor((part_ptr->pose_[1] + dy + map_->info.origin.position.y)/map_->info.resolution + map_->info.height);
+            size_t map_y = floor((part_ptr->pose_[1] + dy - map_->info.origin.position.y)/map_->info.resolution);
             if(map_->data[map_y*map_->info.width + map_x] != 0) //occupied cell
             {
                 dx = 0;

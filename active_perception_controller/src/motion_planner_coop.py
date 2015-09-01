@@ -60,6 +60,10 @@ class MotionPlanner():
                                          queue_size=1,
                                          latch = True)
 
+        self._person_cloud_pub = rospy.Publisher("person_particle_cloud_assigned",
+                                         PointCloud,
+                                         queue_size=1,
+                                         latch = True)
         
         getmap = rospy.ServiceProxy('static_map', GetMap)
         
@@ -81,20 +85,30 @@ class MotionPlanner():
         self._rrt_dist_bias = rospy.get_param("~rrt_total_dist_bias", 0.01)
         self._rrt_near_bias = rospy.get_param("~rrt_nearest_part_bias", 0.1)
         self._rrt_entropy_bias = rospy.get_param("~rrt_entropy_bias", 10)
-        robot_radius = rospy.get_param("~robot_radius", 0.5)
+        robot_radius = rospy.get_param("~robot_radius", 0.6)
         self._robot_radius_px = robot_radius / self._navmap.info.resolution
-        sigma_person = rospy.get_param("sigma_person", 0.05)
+        sigma_person = rospy.get_param("~sigma_person", 0.05)
         self._max_path_size = rospy.get_param("~max_path_size", 10)
         self._max_rrt_iterations = rospy.get_param("~max_rrt_iterations", 200)
-        
+	self._left_agents = rospy.get_param("~left_agents", 0)
+        self._own_agents = rospy.get_param("~own_agents", 1)
+	self._right_agents = rospy.get_param("~right_agents", 0)
+	self._pos_izq=Point32()
+	self._pos_izq.x = rospy.get_param("~pos_izq_x", 0.0)
+	self._pos_izq.y = rospy.get_param("~pos_izq_y", 0.0)
+	self._pos_dcha=Point32()
+	self._pos_dcha.x = rospy.get_param("~pos_dcha_x", 0.0)
+	self._pos_dcha.y = rospy.get_param("~pos_dcha_y", 0.0)
+
+	self.msg_rcv=PointCloud()
+	self.first_time=False
+
         #self._planned = False # This is just for testing purposes. Delete me!
         mapdata = np.asarray(self._navmap.data, dtype=np.int8).reshape(height, width)
         logical = np.flipud(mapdata == 0)
-
-        self._distmap = sp.ndimage.distance_transform_edt(logical)
-
 	
-
+        self._distmap = sp.ndimage.distance_transform_edt(logical)
+        
         pkgpath = roslib.packages.get_pkg_dir('active_perception_controller')
         self.utility_function = ap_utility.Utility(str(pkgpath) + "/config/sensormodel.png",
                                                    0.050000, sigma_person)
@@ -109,19 +123,171 @@ class MotionPlanner():
 
     def target_particle_cloud_cb(self, msg):
         self._lock.acquire()
-        buf = StringIO()
-        msg.serialize(buf)
-        self.utility_function.setPersonParticles(buf.getvalue())
-        channel = [c for c in msg.channels if c.name == 'weights']
-        self.current_weights = channel[0].values
-        self.current_particles = msg.points
-        P = [np.array([0,0])]*len(msg.points)
-        for i in xrange(len(msg.points)):
-            P[i] = np.array([msg.points[i].x, msg.points[i].y])
-        
-        self._particle_nbrs.fit(P)
+
+	self.msg_rcv=msg
+	
+	if self.first_time==False:
+		self.first_time=True
+		self.area_allocation()
+	else:
+		self.area_allocation()
+
         
         self._lock.release()
+
+    def area_allocation(self):
+        buf = StringIO()
+	msg_agent=self.divide_points(self.msg_rcv,self._left_agents,self._own_agents,self._right_agents,self._pos_izq,self._pos_dcha)
+	self._person_cloud_pub.publish(msg_agent)
+        msg_agent.serialize(buf)
+        self.utility_function.setPersonParticles(buf.getvalue())
+        channel = [c for c in msg_agent.channels if c.name == 'weights']
+        self.current_weights = channel[0].values
+        self.current_particles = msg_agent.points
+        P = [np.array([0,0])]*len(msg_agent.points)
+        for i in xrange(len(msg_agent.points)):
+            P[i] = np.array([msg_agent.points[i].x, msg_agent.points[i].y])
+        
+        self._particle_nbrs.fit(P)
+
+    def divide_points(self,msg,la,oa,ra,pos_izq,pos_dcha):
+	total_weight=sum(msg.channels[0].values)
+
+	if la>0 and ra>0:
+		left_weight=(la+oa)*total_weight/(la+oa+ra)
+		right_weight=ra*total_weight/(la+oa+ra)
+		msg_left=self.divide_1to1(msg,left_weight,right_weight,pos_izq,pos_dcha,'left')
+
+		total_weight=sum(msg_left.channels[0].values)
+		left_weight=la*total_weight/(la+oa)
+		agent_weight=oa*total_weight/(la+oa)		
+		msg_agent=self.divide_1to1(msg_left,left_weight,agent_weight,pos_izq,pos_dcha,'right')
+	elif la>0:
+		left_weight=la*total_weight/(la+oa)
+		agent_weight=oa*total_weight/(la+oa)		
+		msg_agent=self.divide_1to1(msg,left_weight,agent_weight,pos_izq,pos_dcha,'right')	
+	elif ra>0:
+		agent_weight=oa*total_weight/(ra+oa)
+		right_weight=ra*total_weight/(ra+oa)
+		msg_agent=self.divide_1to1(msg,agent_weight,right_weight,pos_izq,pos_dcha,'left')	
+	else:
+		msg_agent=msg
+	
+	return msg_agent
+
+
+    def divide_1to1(self,msg,lw,rw,pos_izq,pos_dcha,side):
+	total_weight=sum(msg.channels[0].values)
+	actual_left_weight=0.0
+	actual_right_weight=0.0
+
+	msg_left=PointCloud()
+	msg_right=PointCloud()
+        ch1 = ChannelFloat32()
+        ch1.name = 'weights'
+	ch1.values=[]
+	msg_left.channels.append(ch1)
+        ch2 = ChannelFloat32()
+        ch2.name = 'weights'
+	ch2.values=[]
+	msg_right.channels.append(ch2)
+	ml_dl=[]
+	ml_dr=[]
+	mr_dl=[]
+	mr_dr=[]
+
+	for i in xrange(len(msg.points)):
+		point=Point32()
+		point.x=msg.points[i].x
+		point.y=msg.points[i].y
+		weight=msg.channels[0].values[i]
+
+		if sqrt((point.x-pos_izq.x)*(point.x-pos_izq.x)+(point.y-pos_izq.y)*(point.y-pos_izq.y))<sqrt((point.x-pos_dcha.x)*(point.x-pos_dcha.x)+(point.y-pos_dcha.y)*(point.y-pos_dcha.y)):
+			min_dist=sqrt((point.x-pos_izq.x)*(point.x-pos_izq.x)+(point.y-pos_izq.y)*(point.y-pos_izq.y))
+		else:
+			min_dist=sqrt((point.x-pos_dcha.x)*(point.x-pos_dcha.x)+(point.y-pos_dcha.y)*(point.y-pos_dcha.y))
+		
+		if fabs(sqrt((point.x-pos_izq.x)*(point.x-pos_izq.x)+(point.y-pos_izq.y)*(point.y-pos_izq.y))-min_dist)<0.01:
+			if actual_left_weight<lw:
+				actual_left_weight=actual_left_weight+weight
+				msg_left.points.append(point)
+				msg_left.channels[0].values.append(weight)
+				ml_dl.append(sqrt((point.x-pos_izq.x)*(point.x-pos_izq.x)+(point.y-pos_izq.y)*(point.y-pos_izq.y)))
+				ml_dr.append(sqrt((point.x-pos_dcha.x)*(point.x-pos_dcha.x)+(point.y-pos_dcha.y)*(point.y-pos_dcha.y)))
+			else:
+				tam=len(msg_left.channels[0].values)
+				if lw>0 and (tam==0 or sqrt((point.x-pos_izq.x)*(point.x-pos_izq.x)+(point.y-pos_izq.y)*(point.y-pos_izq.y))<max(ml_dl)):
+					actual_left_weight=actual_left_weight+weight
+				
+					msg_left.points.append(point)
+					msg_left.channels[0].values.append(weight)
+					ml_dl.append(sqrt((point.x-pos_izq.x)*(point.x-pos_izq.x)+(point.y-pos_izq.y)*(point.y-pos_izq.y)))
+					ml_dr.append(sqrt((point.x-pos_dcha.x)*(point.x-pos_dcha.x)+(point.y-pos_dcha.y)*(point.y-pos_dcha.y)))
+					while (actual_left_weight-lw)>0.1:
+						ind=ml_dl.index(max(ml_dl))
+						msg_right.points.append(msg_left.points[ind])
+						msg_right.channels[0].values.append(msg_left.channels[0].values[ind])
+						mr_dr.append(sqrt((msg_left.points[ind].x-pos_dcha.x)*(msg_left.points[ind].x-pos_dcha.x)+(msg_left.points[ind].y-pos_dcha.y)*(msg_left.points[ind].y-pos_dcha.y)))
+						mr_dl.append(sqrt((msg_left.points[ind].x-pos_izq.x)*(msg_left.points[ind].x-pos_izq.x)+(msg_left.points[ind].y-pos_izq.y)*(msg_left.points[ind].y-pos_izq.y)))
+						actual_right_weight=actual_right_weight+msg_left.channels[0].values[ind]
+						actual_left_weight=actual_left_weight-msg_left.channels[0].values[ind]
+						msg_left.points.pop(ind)
+						msg_left.channels[0].values.pop(ind)
+						ml_dl.pop(ind)
+						ml_dr.pop(ind)
+				else:
+					actual_right_weight=actual_right_weight+weight	
+
+					msg_right.points.append(point)
+					msg_right.channels[0].values.append(weight)
+					mr_dr.append(sqrt((point.x-pos_dcha.x)*(point.x-pos_dcha.x)+(point.y-pos_dcha.y)*(point.y-pos_dcha.y)))
+					mr_dl.append(sqrt((point.x-pos_izq.x)*(point.x-pos_izq.x)+(point.y-pos_izq.y)*(point.y-pos_izq.y)))
+		else:
+			if actual_right_weight<rw:
+				actual_right_weight=actual_right_weight+weight
+				msg_right.points.append(point)
+				msg_right.channels[0].values.append(weight)
+				mr_dr.append(sqrt((point.x-pos_dcha.x)*(point.x-pos_dcha.x)+(point.y-pos_dcha.y)*(point.y-pos_dcha.y)))
+				mr_dl.append(sqrt((point.x-pos_izq.x)*(point.x-pos_izq.x)+(point.y-pos_izq.y)*(point.y-pos_izq.y)))	
+			else:	
+				tam=len(msg_right.channels[0].values)
+				if rw>0 and (tam==0 or sqrt((point.x-pos_dcha.x)*(point.x-pos_dcha.x)+(point.y-pos_dcha.y)*(point.y-pos_dcha.y))<max(mr_dr)):
+					actual_right_weight=actual_right_weight+weight
+				
+					msg_right.points.append(point)
+					msg_right.channels[0].values.append(weight)
+					mr_dr.append(sqrt((point.x-pos_dcha.x)*(point.x-pos_dcha.x)+(point.y-pos_dcha.y)*(point.y-pos_dcha.y)))
+					mr_dl.append(sqrt((point.x-pos_izq.x)*(point.x-pos_izq.x)+(point.y-pos_izq.y)*(point.y-pos_izq.y)))
+					while (actual_right_weight-rw)>0.1:
+						ind=mr_dr.index(max(mr_dr))
+						msg_left.points.append(msg_right.points[ind])
+						msg_left.channels[0].values.append(msg_right.channels[0].values[ind])
+						ml_dl.append(sqrt((msg_right.points[ind].x-pos_izq.x)*(msg_right.points[ind].x-pos_izq.x)+(msg_right.points[ind].y-pos_izq.y)*(msg_right.points[ind].y-pos_izq.y)))
+						ml_dr.append(sqrt((msg_right.points[ind].x-pos_dcha.x)*(msg_right.points[ind].x-pos_dcha.x)+(msg_right.points[ind].y-pos_dcha.y)*(msg_right.points[ind].y-pos_dcha.y)))
+						actual_left_weight=actual_left_weight+msg_right.channels[0].values[ind]
+						actual_right_weight=actual_right_weight-msg_right.channels[0].values[ind]
+						msg_right.points.pop(ind)
+						msg_right.channels[0].values.pop(ind)
+						mr_dr.pop(ind)
+						mr_dl.pop(ind)
+				else:
+					actual_left_weight=actual_left_weight+weight	
+
+					msg_left.points.append(point)
+					msg_left.channels[0].values.append(weight)
+					ml_dl.append(sqrt((point.x-pos_izq.x)*(point.x-pos_izq.x)+(point.y-pos_izq.y)*(point.y-pos_izq.y)))
+					ml_dr.append(sqrt((point.x-pos_dcha.x)*(point.x-pos_dcha.x)+(point.y-pos_dcha.y)*(point.y-pos_dcha.y)))	
+	
+	msg_out=PointCloud()
+	if side=='left':
+		msg_out=msg_left
+	else:
+		msg_out=msg_right
+
+	msg_out.header.frame_id="/map"
+	return msg_out			
+
+					
         
     def _plan_srv_cb(self, msg):
         path = self.plan()
@@ -131,6 +297,7 @@ class MotionPlanner():
 
     def plan(self):
         self._lock.acquire()
+	#self.area_allocation()
         #path = self.rrtstar(self.sample_free_uniform)
         path = self.rrtstar(self.sample_from_particles)
         self._lock.release()
@@ -282,7 +449,7 @@ class MotionPlanner():
                         w = ap_utility.VectorOfDoubles()
                         w_near = ap_utility.VectorOfDoubles()
                         w.extend(W[-1]) # pnew
-                        if np.abs(Ent[p_idx] - entropy) < 1e-6: # if there is anything to gain in terms of information
+                        if np.abs(Ent[p_idx] - entropy) <= 0: #1e-6: # if there is anything to gain in terms of information
                             entropy_near = self.utility_function.computeExpEntropy(pnew[0], pnew[1], 0.0, w, w_near)
                         else:
                             entropy_near = Ent[p_idx]
@@ -309,7 +476,7 @@ class MotionPlanner():
                 nbrs.fit(V)
             # print 'iteration done. time: ', time.time()-t2
             # print 'min entropy:', np.min(I)
-            if np.max(Ent) - np.min(Ent) > 1e-6: # just to compensate arithmetic noise
+            if np.max(Ent) - np.min(Ent) >= 1e-6: # just to compensate arithmetic noise
                 informative_point_found = True
 
             """
@@ -384,7 +551,7 @@ class MotionPlanner():
             c += 1
         if not at_root:
             rospy.logerr("Could not find RRT root! Exiting at node %d",m)
-            pdb.set_trace()
+            #pdb.set_trace()
             
         pt.poses.reverse() # fundamental, since poses were added from the end to the beginning
         return pt

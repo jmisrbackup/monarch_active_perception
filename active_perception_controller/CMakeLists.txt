@@ -123,6 +123,8 @@ file(GLOB hdrs "include/active_perception_controller/*.h")
 
 add_executable(person_estimator src/person_estimator.cpp src/particle_filter.cpp src/person_particle_filter.cpp src/rfid_sensor_model.cpp ${hdrs})
 target_link_libraries(person_estimator gsl gslcblas ap_utility)
+add_executable(person_estimator_coop src/person_estimator_coop.cpp src/particle_filter.cpp src/person_particle_filter.cpp src/rfid_sensor_model.cpp ${hdrs})
+target_link_libraries(person_estimator_coop gsl gslcblas ap_utility)
 
 #############
 ## Install ##
