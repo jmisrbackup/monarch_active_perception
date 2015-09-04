@@ -5,7 +5,7 @@ set(CMAKE_BUILD_TYPE Debug)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED message_generation roscpp geometry_msgs std_msgs nav_msgs roslib)
+find_package(catkin REQUIRED COMPONENTS message_generation roscpp geometry_msgs std_msgs nav_msgs roslib monarch_situational_awareness)
 
 ## System dependencies are found with CMake's conventions
 find_package( Boost REQUIRED COMPONENTS python )
@@ -79,7 +79,7 @@ generate_messages(
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ap_utility
-  CATKIN_DEPENDS message_runtime
+  CATKIN_DEPENDS message_runtime monarch_situational_awareness
 #  DEPENDS system_lib
 )
 
@@ -90,7 +90,7 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 
-include_directories(include ${OpenCV_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS} )
+include_directories(include ${OpenCV_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS})
 
 ## Declare a cpp library
 add_library(ap_utility
@@ -125,6 +125,8 @@ add_executable(person_estimator src/person_estimator.cpp src/particle_filter.cpp
 target_link_libraries(person_estimator gsl gslcblas ap_utility)
 add_executable(person_estimator_coop src/person_estimator_coop.cpp src/particle_filter.cpp src/person_particle_filter.cpp src/rfid_sensor_model.cpp ${hdrs})
 target_link_libraries(person_estimator_coop gsl gslcblas ap_utility)
+add_executable(person_estimator_coop_sam src/person_estimator_coop_sam.cpp src/particle_filter.cpp src/person_particle_filter.cpp src/rfid_sensor_model.cpp ${hdrs})
+target_link_libraries(person_estimator_coop_sam gsl gslcblas ap_utility)
 
 #############
 ## Install ##
