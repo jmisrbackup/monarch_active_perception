@@ -1,0 +1,151 @@
+<?xml version="1.0"?>
+
+<launch>
+ 
+
+    <node name="map_server" pkg="map_server" type="map_server" args="$(find stage_simulation)/config/prueba.yaml">
+        <param name="frame_id" value="/map" />
+    </node>
+    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find stage_simulation)/config/simulation_4robots.rviz">
+
+    </node>
+
+    <include file="$(find stage_simulation)/launch/stage_4robots.launch"/>
+    <include file="$(find stage_simulation)/launch/amcl_4robots.launch" />
+
+
+
+    <node pkg="active_perception_controller" type="person_estimator_desc" name="estimator0">
+	<param name="step_duration" type="double" value="0.2" />
+	<param name="num_particles" type="int" value="3000" />
+	<param name="sigma_person" type="double" value="0.1" />
+	<param name="rfid_map_resolution" type="double" value="0.06" />
+	<param name="rfid_prob_map" type="string" value="$(find active_perception_controller)/config/sensormodel.png" />
+	<param name="left_pos_x" type="double" value="-30.0" />
+	<param name="left_pos_y" type="double" value="0.0" />
+	<param name="right_pos_x" type="double" value="30.0" />
+	<param name="right_pos_y" type="double" value="0.0" />
+	<param name="left_weight" type="double" value="3.0" />
+	<param name="own_weight" type="double" value="1.0" />
+	<param name="right_weight" type="double" value="0.0" />
+	<param name="robot_name" type="string" value="mbot01" />
+	<param name="robot_left" type="string" value="mbot04" />
+	<param name="robot_right" type="string" value="mbot05" />
+	<param name="comm_period" type="double" value="10.0" />	
+	<param name="odd" type="int" value="0" />	
+
+        <remap from="plan" to="/robot_0/plan"/>
+        <remap from="amcl_pose" to="/robot_0/amcl_pose" />
+	<remap from="person_particle_cloud" to="/robot_0/person_particle_cloud" />
+    </node>
+
+    <node pkg="active_perception_controller" type="person_estimator_desc" name="estimator1">
+	<param name="step_duration" type="double" value="0.2" />
+	<param name="num_particles" type="int" value="3000" />
+	<param name="sigma_person" type="double" value="0.1" />
+	<param name="rfid_map_resolution" type="double" value="0.06" />
+	<param name="rfid_prob_map" type="string" value="$(find active_perception_controller)/config/sensormodel.png" />
+	<param name="left_pos_x" type="double" value="-30.0" />
+	<param name="left_pos_y" type="double" value="0.0" />
+	<param name="right_pos_x" type="double" value="30.0" />
+	<param name="right_pos_y" type="double" value="0.0" />
+	<param name="left_weight" type="double" value="0.0" />
+	<param name="own_weight" type="double" value="1.0" />
+	<param name="right_weight" type="double" value="3.0" />
+	<param name="robot_name" type="string" value="mbot02" />
+	<param name="robot_left" type="string" value="mbot05" />
+	<param name="robot_right" type="string" value="mbot03" />
+	<param name="comm_period" type="double" value="10.0" />	
+	<param name="odd" type="int" value="1" />	
+
+        <remap from="plan" to="/robot_1/plan"/>
+        <remap from="amcl_pose" to="/robot_1/amcl_pose" />
+	<remap from="person_particle_cloud" to="/robot_1/person_particle_cloud" />
+    </node>
+
+    <node pkg="active_perception_controller" type="person_estimator_desc" name="estimator2">
+	<param name="step_duration" type="double" value="0.2" />
+	<param name="num_particles" type="int" value="3000" />
+	<param name="sigma_person" type="double" value="0.1" />
+	<param name="rfid_map_resolution" type="double" value="0.06" />
+	<param name="rfid_prob_map" type="string" value="$(find active_perception_controller)/config/sensormodel.png" />
+	<param name="left_pos_x" type="double" value="-30.0" />
+	<param name="left_pos_y" type="double" value="0.0" />
+	<param name="right_pos_x" type="double" value="30.0" />
+	<param name="right_pos_y" type="double" value="0.0" />
+	<param name="left_weight" type="double" value="1.0" />
+	<param name="own_weight" type="double" value="1.0" />
+	<param name="right_weight" type="double" value="2.0" />
+	<param name="robot_name" type="string" value="mbot03" />
+	<param name="robot_left" type="string" value="mbot02" />
+	<param name="robot_right" type="string" value="mbot04" />
+	<param name="comm_period" type="double" value="10.0" />	
+	<param name="odd" type="int" value="0" />	
+
+        <remap from="plan" to="/robot_2/plan"/>
+        <remap from="amcl_pose" to="/robot_2/amcl_pose" />
+	<remap from="person_particle_cloud" to="/robot_2/person_particle_cloud" />
+    </node>
+
+    <node pkg="active_perception_controller" type="person_estimator_desc" name="estimator3">
+	<param name="step_duration" type="double" value="0.2" />
+	<param name="num_particles" type="int" value="3000" />
+	<param name="sigma_person" type="double" value="0.1" />
+	<param name="rfid_map_resolution" type="double" value="0.06" />
+	<param name="rfid_prob_map" type="string" value="$(find active_perception_controller)/config/sensormodel.png" />
+	<param name="left_pos_x" type="double" value="-30.0" />
+	<param name="left_pos_y" type="double" value="0.0" />
+	<param name="right_pos_x" type="double" value="30.0" />
+	<param name="right_pos_y" type="double" value="0.0" />
+	<param name="left_weight" type="double" value="2.0" />
+	<param name="own_weight" type="double" value="1.0" />
+	<param name="right_weight" type="double" value="1.0" />
+	<param name="robot_name" type="string" value="mbot04" />
+	<param name="robot_left" type="string" value="mbot03" />
+	<param name="robot_right" type="string" value="mbot01" />
+	<param name="comm_period" type="double" value="10.0" />	
+	<param name="odd" type="int" value="1" />	
+
+        <remap from="plan" to="/robot_3/plan"/>
+        <remap from="amcl_pose" to="/robot_3/amcl_pose" />
+	<remap from="person_particle_cloud" to="/robot_3/person_particle_cloud" />
+    </node>
+
+  
+    <node pkg="active_perception_controller" type="active_perception_task_node.py" name="active_perception_task_node0">   
+
+        <remap from="/move_base/status" to="/robot_0/move_base/status"/>
+        <remap from="/move_base/result" to="/robot_0/move_base/result"/>
+        <remap from="/move_base/feedback" to="/robot_0/move_base/feedback"/>
+        <remap from="/move_base/goal" to="/robot_0/move_base/goal"/>
+        <remap from="/move_base/cancel" to="/robot_0/move_base/cancel"/>
+    </node> 
+
+    <node pkg="active_perception_controller" type="active_perception_task_node.py" name="active_perception_task_node1">   
+
+        <remap from="/move_base/status" to="/robot_1/move_base/status"/>
+        <remap from="/move_base/result" to="/robot_1/move_base/result"/>
+        <remap from="/move_base/feedback" to="/robot_1/move_base/feedback"/>
+        <remap from="/move_base/goal" to="/robot_1/move_base/goal"/>
+        <remap from="/move_base/cancel" to="/robot_1/move_base/cancel"/>
+    </node> 
+
+    <node pkg="active_perception_controller" type="active_perception_task_node.py" name="active_perception_task_node2">   
+
+        <remap from="/move_base/status" to="/robot_2/move_base/status"/>
+        <remap from="/move_base/result" to="/robot_2/move_base/result"/>
+        <remap from="/move_base/feedback" to="/robot_2/move_base/feedback"/>
+        <remap from="/move_base/goal" to="/robot_2/move_base/goal"/>
+        <remap from="/move_base/cancel" to="/robot_2/move_base/cancel"/>
+    </node> 
+
+    <node pkg="active_perception_controller" type="active_perception_task_node.py" name="active_perception_task_node3">   
+
+        <remap from="/move_base/status" to="/robot_3/move_base/status"/>
+        <remap from="/move_base/result" to="/robot_3/move_base/result"/>
+        <remap from="/move_base/feedback" to="/robot_3/move_base/feedback"/>
+        <remap from="/move_base/goal" to="/robot_3/move_base/goal"/>
+        <remap from="/move_base/cancel" to="/robot_3/move_base/cancel"/>
+    </node> 
+
+</launch>

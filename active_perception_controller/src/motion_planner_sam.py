@@ -18,6 +18,8 @@ from rospy.numpy_msg import numpy_msg
 from sensor_msgs.msg import PointCloud, ChannelFloat32
 from sklearn.neighbors import NearestNeighbors
 
+from sam_helpers.reader import SAMReader
+
 import time
 import threading
 import numpy as np
@@ -43,6 +45,10 @@ class MotionPlanner():
                                                       self.target_particle_cloud_cb,
                                                       queue_size=1)
 
+	#self.robot_name = rospy.get_param("~name", "mbot01")
+	
+	#self._target_particles_sub = SAMReader("["+self.robot_name+"] Person_belief",self.target_particle_cloud_cb)
+
         self._robot_pose = PoseWithCovariance()
         
         self._rrt_pub = rospy.Publisher("rrt",
@@ -60,6 +66,10 @@ class MotionPlanner():
                                          queue_size=1,
                                          latch = True)
 
+        self._person_cloud_pub = rospy.Publisher("person_particle_cloud_assigned",
+                                         PointCloud,
+                                         queue_size=1,
+                                         latch = True)
         
         getmap = rospy.ServiceProxy('static_map', GetMap)
         
@@ -81,20 +91,30 @@ class MotionPlanner():
         self._rrt_dist_bias = rospy.get_param("~rrt_total_dist_bias", 0.01)
         self._rrt_near_bias = rospy.get_param("~rrt_nearest_part_bias", 0.1)
         self._rrt_entropy_bias = rospy.get_param("~rrt_entropy_bias", 10)
-        robot_radius = rospy.get_param("~robot_radius", 0.5)
+        robot_radius = rospy.get_param("~robot_radius", 0.6)
         self._robot_radius_px = robot_radius / self._navmap.info.resolution
-        sigma_person = rospy.get_param("sigma_person", 0.05)
+        sigma_person = rospy.get_param("~sigma_person", 0.05)
         self._max_path_size = rospy.get_param("~max_path_size", 10)
         self._max_rrt_iterations = rospy.get_param("~max_rrt_iterations", 200)
-        
+	self._left_agents = rospy.get_param("~left_agents", 0)
+        self._own_agents = rospy.get_param("~own_agents", 1)
+	self._right_agents = rospy.get_param("~right_agents", 0)
+	self._pos_izq=Point32()
+	self._pos_izq.x = rospy.get_param("~pos_izq_x", 0.0)
+	self._pos_izq.y = rospy.get_param("~pos_izq_y", 0.0)
+	self._pos_dcha=Point32()
+	self._pos_dcha.x = rospy.get_param("~pos_dcha_x", 0.0)
+	self._pos_dcha.y = rospy.get_param("~pos_dcha_y", 0.0)
+
+	self.msg_rcv=PointCloud()
+	self.first_time=False
+
         #self._planned = False # This is just for testing purposes. Delete me!
         mapdata = np.asarray(self._navmap.data, dtype=np.int8).reshape(height, width)
         logical = np.flipud(mapdata == 0)
-
-        self._distmap = sp.ndimage.distance_transform_edt(logical)
-
 	
-
+        self._distmap = sp.ndimage.distance_transform_edt(logical)
+        
         pkgpath = roslib.packages.get_pkg_dir('active_perception_controller')
         self.utility_function = ap_utility.Utility(str(pkgpath) + "/config/sensormodel.png",
                                                    0.050000, sigma_person)
@@ -120,8 +140,8 @@ class MotionPlanner():
             P[i] = np.array([msg.points[i].x, msg.points[i].y])
         
         self._particle_nbrs.fit(P)
-        
         self._lock.release()
+					
         
     def _plan_srv_cb(self, msg):
         path = self.plan()
@@ -131,8 +151,8 @@ class MotionPlanner():
 
     def plan(self):
         self._lock.acquire()
-        #path = self.rrtstar(self.sample_free_uniform)
-        path = self.rrtstar(self.sample_from_particles)
+        #path = self.rrtstar(self.sample_from_particles)
+        path = self.rrtstar(self.sample_free_uniform)
         self._lock.release()
         return path
         
@@ -282,7 +302,7 @@ class MotionPlanner():
                         w = ap_utility.VectorOfDoubles()
                         w_near = ap_utility.VectorOfDoubles()
                         w.extend(W[-1]) # pnew
-                        if np.abs(Ent[p_idx] - entropy) > 1e-6: # if there is anything to gain in terms of information
+                        if np.abs(Ent[p_idx] - entropy) <= 0: #1e-6: # if there is anything to gain in terms of information
                             entropy_near = self.utility_function.computeExpEntropy(pnew[0], pnew[1], 0.0, w, w_near)
                         else:
                             entropy_near = Ent[p_idx]
@@ -309,7 +329,7 @@ class MotionPlanner():
                 nbrs.fit(V)
             # print 'iteration done. time: ', time.time()-t2
             # print 'min entropy:', np.min(I)
-            if np.max(Ent) - np.min(Ent) > 1e-6: # just to compensate arithmetic noise
+            if np.max(Ent) - np.min(Ent) >= 1e-6: # just to compensate arithmetic noise
                 informative_point_found = True
 
             """

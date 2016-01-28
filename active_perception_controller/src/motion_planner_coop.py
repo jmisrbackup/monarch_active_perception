@@ -298,8 +298,8 @@ class MotionPlanner():
     def plan(self):
         self._lock.acquire()
 	#self.area_allocation()
-        path = self.rrtstar(self.sample_free_uniform)
-        #path = self.rrtstar(self.sample_from_particles)
+        #path = self.rrtstar(self.sample_free_uniform)
+        path = self.rrtstar(self.sample_from_particles)
         self._lock.release()
         return path
         

@@ -40,6 +40,7 @@ class PersonEstimator
     int num_particles_;                                 /// Number of particles of the filter
     string global_frame_id_;                            /// Global frame id
     int num_robots_;					/// Number of robots uisng this filter
+    string robot_names_[10];
 
     PersonParticleFilter *person_pf_;                   /// Particle filter for person
     geometry_msgs::PoseArray robot_cloud_[10];              /// Particles for robot pose
@@ -84,6 +85,12 @@ PersonEstimator::PersonEstimator()
     private_nh.param("sigma_person", sigma_person, 0.05);
     private_nh.param("global_frame_id", global_frame_id_, string("map"));
     private_nh.param("num_robots", num_robots_, 1);
+    for (int i=0;i<num_robots_;i++)
+    {
+	std::stringstream parameter;
+	parameter << "robot_name_" << i;
+	private_nh.param(parameter.str().c_str(), robot_names_[i], string("mbot01"));
+    }
 
     if(!private_nh.getParam("rfid_map_resolution", rfid_map_res)
             || !private_nh.getParam("rfid_prob_map", rfid_prob_map))
@@ -120,7 +127,7 @@ PersonEstimator::PersonEstimator()
            // strcat(str1, index);
            // strcat(str1, "/particlecloud");
 	    std::stringstream topicName1;
-	    topicName1 << "[mbot0" << i+1 << "] RobotPose";
+	    topicName1 << "[" << robot_names_[i] << "] RobotPose";
 	    ros::Duration d(0.5);
             while(!robot_reader_[i].response.success)
             {
@@ -133,7 +140,7 @@ PersonEstimator::PersonEstimator()
            // strcat(str2, index);
            // strcat(str2, "/rfid");
 	    std::stringstream topicName2;
-	    topicName2 << "[mbot0" << i+1 << "] RFIDDetected";
+	    topicName2 << "[" << robot_names_[i] << "] RFIDDetected";
     	    
             while(!rfid_[i].response.success)
             {

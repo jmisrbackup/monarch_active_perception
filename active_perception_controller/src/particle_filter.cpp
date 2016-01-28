@@ -71,9 +71,14 @@ vector<int> ParticleFilter::calcResampledSet()
     double c, u, r;
     int num_samples = particles_.size();
 
+    double total_weight=0.0;
+    for (int i=0; i<num_samples;i++)
+	total_weight=total_weight+particles_[i]->weight_;
+   
+
     if(num_samples > 0)
     {
-        r = gsl_rng_uniform(ran_generator_)*(1.0/num_samples);
+        r = gsl_rng_uniform(ran_generator_)*(total_weight/num_samples);
 
         int m, i;
 
@@ -81,7 +86,7 @@ vector<int> ParticleFilter::calcResampledSet()
         c = particles_[0]->weight_;
         for (int m = 0; m < num_samples; m++)
         {
-          u = r + (m) * (1.0 / num_samples);
+          u = r + (m) * (total_weight / num_samples);
           while (u > c)
           {
             i = i + 1;

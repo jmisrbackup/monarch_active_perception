@@ -52,6 +52,9 @@ else:
 
 	for topic, msg, t in bag.read_messages():
 		
+		valid_pose = 1
+		robot_x = 1
+		robot_y= 1
 		if topic=="/base_pose_ground_truth":
 			valid_pose = 1
 			robot_x = msg.pose.pose.position.x

@@ -127,6 +127,8 @@ add_executable(person_estimator_coop src/person_estimator_coop.cpp src/particle_
 target_link_libraries(person_estimator_coop gsl gslcblas ap_utility)
 add_executable(person_estimator_coop_sam src/person_estimator_coop_sam.cpp src/particle_filter.cpp src/person_particle_filter.cpp src/rfid_sensor_model.cpp ${hdrs})
 target_link_libraries(person_estimator_coop_sam gsl gslcblas ap_utility)
+add_executable(person_estimator_desc src/person_estimator_desc.cpp src/particle_filter.cpp src/person_particle_filter_desc.cpp src/rfid_sensor_model.cpp ${hdrs})
+target_link_libraries(person_estimator_desc gsl gslcblas ap_utility)
 
 #############
 ## Install ##
